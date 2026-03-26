@@ -1,3 +1,4 @@
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
 
@@ -8,7 +9,11 @@ db = Database()
 
 async def connect_to_mongo():
     """Khởi tạo kết nối khi App bắt đầu"""
-    db.client = AsyncIOMotorClient(settings.MONGO_DETAILS)
+    db.client = AsyncIOMotorClient(
+        settings.MONGO_DETAILS,
+        tls=True,
+        tlsCAFile=certifi.where()
+    )
     # Kiểm tra kết nối
     await db.client.admin.command('ping')
 
