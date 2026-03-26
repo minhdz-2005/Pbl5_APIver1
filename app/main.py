@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
-from app.api.v1.endpoints import users, business_profiles, businesses, categories  # Import router 
+from app.api.v1.router import api_router
 
 
 # 1. Định nghĩa Lifespan handler (Quản lý startup/shutdown)
@@ -30,11 +30,7 @@ app = FastAPI(
 )
 
 # 3. Đăng ký các Router (Endpoints)
-# Prefix này sẽ gộp với prefix trong router của users (nếu có)
-app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
-app.include_router(business_profiles.router, prefix=f"{settings.API_V1_STR}/business-profile", tags=["Business Profile"])
-app.include_router(businesses.router, prefix=f"{settings.API_V1_STR}/businesses", tags=["Businesses"])
-app.include_router(categories.router, prefix=f"{settings.API_V1_STR}/categories", tags=["Categories"])
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # 4. Route kiểm tra nhanh tại trang chủ
 @app.get("/", tags=["Root"])
