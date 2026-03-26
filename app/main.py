@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
@@ -40,6 +41,16 @@ async def root():
         "status": "running",
         "docs": "/docs"
     }
+
+origins = ["*"] # Cho phép tất cả origin (có thể tùy chỉnh nếu cần)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 5. Để chạy trực tiếp bằng lệnh: python app/main.py
 if __name__ == "__main__":
