@@ -14,7 +14,21 @@ async def create_user(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     repo = UserRepository(db)
-    # Kiểm tra email tồn tại (bạn có thể viết thêm hàm check_email trong repo)
+    
+    # Kiểm tra email đã tồn tại
+    if await repo.check_email_exists(user_in.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Kiểm tra username đã tồn tại
+    if await repo.check_username_exists(user_in.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+    
     new_user = await repo.create(user_in)
     return new_user
 

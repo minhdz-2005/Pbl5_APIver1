@@ -2,7 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.models.user import UserModel
 from app.schemas.user import UserCreate
 from passlib.context import CryptContext
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from app.schemas.user import UserUpdate
 from typing import Optional
@@ -18,6 +18,20 @@ class UserRepository:
     def hash_password(password: str) -> str:
         return pwd_context.hash(password)
 
+    async def check_email_exists(self, email: str) -> bool:
+        """Kiểm tra email đã tồn tại trong DB hay chưa"""
+        user = await self.collection.find_one(
+            {"email": {"$regex": f"^{email}$", "$options": "i"}}
+        )
+        return user is not None
+
+    async def check_username_exists(self, username: str) -> bool:
+        """Kiểm tra username đã tồn tại trong DB hay chưa"""
+        user = await self.collection.find_one(
+            {"username": {"$regex": f"^{username}$", "$options": "i"}}
+        )
+        return user is not None
+
     async def create(self, user_in: UserCreate) -> dict:
         # 1. Chuyển đổi Schema sang dict và mã hóa mật khẩu
         user_data = user_in.model_dump()
@@ -26,7 +40,7 @@ class UserRepository:
         user_dict = UserModel(
             **user_data,
             password_hash=self.hash_password(password),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         ).model_dump()
 
         # 2. Lưu vào MongoDB

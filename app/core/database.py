@@ -16,6 +16,28 @@ async def connect_to_mongo():
     )
     # Kiểm tra kết nối
     await db.client.admin.command('ping')
+    
+    # Tạo unique indexes cho users collection
+    await setup_indexes()
+
+async def setup_indexes():
+    """Tạo các indexes cho database"""
+    database = db.client[settings.DATABASE_NAME]
+    users_collection = database["users"]
+    
+    # Tạo unique index cho email (case-insensitive)
+    await users_collection.create_index(
+        "email",
+        unique=True,
+        collation={"locale": "en", "strength": 2}  # Case-insensitive
+    )
+    
+    # Tạo unique index cho username (case-insensitive)
+    await users_collection.create_index(
+        "username",
+        unique=True,
+        collation={"locale": "en", "strength": 2}  # Case-insensitive
+    )
 
 async def close_mongo_connection():
     """Đóng kết nối khi App tắt"""
