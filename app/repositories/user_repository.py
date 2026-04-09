@@ -40,6 +40,7 @@ class UserRepository:
         user_dict = UserModel(
             **user_data,
             password_hash=self.hash_password(password),
+            available_credits=10,  # Tặng 10 credits trải nghiệm cho v2
             created_at=datetime.now(timezone.utc)
         ).model_dump()
 

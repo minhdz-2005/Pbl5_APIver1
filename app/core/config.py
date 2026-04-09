@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     # API Metadata
     PROJECT_NAME: str = "pbl5 fastapi app"
     API_V1_STR: str = "/api"
+    API_V2_STR: str = "/api/v2"
     
     # Security
     SECRET_KEY: str

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.api.v1.router import api_router
+from app.api.v2.router import api_router as api_router_v2
 
 
 # 1. Định nghĩa Lifespan handler (Quản lý startup/shutdown)
@@ -32,6 +33,7 @@ app = FastAPI(
 
 # 3. Đăng ký các Router (Endpoints)
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router_v2, prefix=settings.API_V2_STR)
 
 # 4. Route kiểm tra nhanh tại trang chủ
 @app.get("/", tags=["Root"])
