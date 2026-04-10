@@ -28,3 +28,10 @@ class BusinessProfileRead(BusinessProfileBase):
         from_attributes=True,
         populate_by_name=True
     )
+
+class BusinessInterestsUpdate(BaseModel):
+    category_ids: List[str]
+
+class BusinessInterestsRead(BaseModel):
+    business_id: str
+    category_ids: List[str]

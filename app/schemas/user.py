@@ -20,7 +20,7 @@ class UserCreate(UserBase):
 # --- Schema Read (Dùng cho API Response) ---
 class UserRead(UserBase):
     id: str = Field(..., alias="_id") 
-    available_credits: int
+    available_credits: int = Field(default=10, ge=0)
     created_at: datetime
 
     model_config = ConfigDict(
