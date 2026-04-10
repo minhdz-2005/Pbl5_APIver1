@@ -52,3 +52,30 @@ class SubscriptionRepository:
             return False
         result = await self.collection.delete_one({"_id": ObjectId(plan_id)})
         return result.deleted_count > 0
+    
+# Giữ nguyên các phần import...
+
+class SubscriptionRepository:
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.collection = db["subscription_plans"]
+
+    # Hàm create giữ nguyên logic vì model_dump sẽ tự lấy field mới
+    async def create(self, plan_in: SubscriptionPlanCreate) -> dict:
+        plan_data = plan_in.model_dump()
+        new_plan = SubscriptionPlanModel(**plan_data)
+        plan_dict = new_plan.model_dump()
+        result = await self.collection.insert_one(plan_dict)
+        plan_dict["_id"] = str(result.inserted_id)
+        return plan_dict
+
+    async def get_all(self) -> List[dict]:
+        plans = []
+        # Sắp xếp theo giá tăng dần để FE hiển thị đúng thứ tự bảng giá
+        cursor = self.collection.find().sort("price_per_month", 1)
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            plans.append(doc)
+        return plans
+
+    # Các hàm get_by_name, update, delete giữ nguyên
+    # Vì update_data = plan_in.model_dump(exclude_unset=True) đã tự xử lý field động
