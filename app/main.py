@@ -32,7 +32,7 @@ app = FastAPI(
 )
 
 # 3. Đăng ký các Router (Endpoints)
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(api_router_v2, prefix=settings.API_V2_STR)
 
 # 4. Route kiểm tra nhanh tại trang chủ

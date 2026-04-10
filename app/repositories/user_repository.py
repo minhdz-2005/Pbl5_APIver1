@@ -1,13 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.models.user import UserModel
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserUpdate
 from passlib.context import CryptContext
 from datetime import datetime, timezone
 from bson import ObjectId
-from app.schemas.user import UserUpdate
-from typing import Optional
+from typing import Optional, List
 
-# Thiết lập công cụ mã hóa mật khẩu
+# Thiết lập mã hóa mật khẩu
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserRepository:
@@ -19,46 +18,31 @@ class UserRepository:
         return pwd_context.hash(password)
 
     async def check_email_exists(self, email: str) -> bool:
-        """Kiểm tra email đã tồn tại trong DB hay chưa"""
-        user = await self.collection.find_one(
-            {"email": {"$regex": f"^{email}$", "$options": "i"}}
-        )
+        user = await self.collection.find_one({"email": email})
         return user is not None
 
     async def check_username_exists(self, username: str) -> bool:
-        """Kiểm tra username đã tồn tại trong DB hay chưa"""
-        user = await self.collection.find_one(
-            {"username": {"$regex": f"^{username}$", "$options": "i"}}
-        )
+        user = await self.collection.find_one({"username": username})
         return user is not None
 
     async def create(self, user_in: UserCreate) -> dict:
-        # 1. Chuyển đổi Schema sang dict và mã hóa mật khẩu
         user_data = user_in.model_dump()
-        password = str(user_data.pop("password")) # Đảm bảo là string
+        password = str(user_data.pop("password"))
         
-        user_dict = UserModel(
+        # Khởi tạo model với các giá trị mặc định theo yêu cầu mới
+        new_user = UserModel(
             **user_data,
             password_hash=self.hash_password(password),
-            available_credits=10,  # Tặng 10 credits trải nghiệm cho v2
+            available_credits=10, # Mặc định tặng 10 credits
             created_at=datetime.now(timezone.utc)
-        ).model_dump()
-
-        # 2. Lưu vào MongoDB
+        )
+        
+        user_dict = new_user.model_dump()
         result = await self.collection.insert_one(user_dict)
         
-        # 3. Trả về document đã tạo (kèm ID)
         user_dict["_id"] = str(result.inserted_id)
         return user_dict
 
-    async def get_all(self):
-        users = []
-        cursor = self.collection.find()
-        async for document in cursor:
-            document["_id"] = str(document["_id"])
-            users.append(document)
-        return users
-    
     async def get_by_id(self, user_id: str) -> Optional[dict]:
         if not ObjectId.is_valid(user_id):
             return None
@@ -68,12 +52,25 @@ class UserRepository:
             user["_id"] = str(user["_id"])
         return user
 
+    async def get_by_email(self, email: str) -> Optional[dict]:
+        user = await self.collection.find_one({"email": email})
+        if user:
+            user["_id"] = str(user["_id"])
+        return user
+
+    async def get_all(self) -> List[dict]:
+        users = []
+        async for user in self.collection.find():
+            user["_id"] = str(user["_id"])
+            users.append(user)
+        return users
+
     async def update(self, user_id: str, user_in: UserUpdate) -> Optional[dict]:
         if not ObjectId.is_valid(user_id):
             return None
 
-        # Chỉ lấy các field có giá trị (không None) để cập nhật
-        update_data = {k: v for k, v in user_in.model_dump().items() if v is not None}
+        # Loại bỏ các giá trị None để tránh ghi đè dữ liệu cũ bằng null
+        update_data = {k: v for k, v in user_in.model_dump(exclude_unset=True).items() if v is not None}
         
         if not update_data:
             return await self.get_by_id(user_id)
@@ -81,7 +78,7 @@ class UserRepository:
         result = await self.collection.find_one_and_update(
             {"_id": ObjectId(user_id)},
             {"$set": update_data},
-            return_document=True # Trả về document sau khi đã update
+            return_document=True 
         )
         
         if result:
@@ -89,14 +86,7 @@ class UserRepository:
         return result
 
     async def delete(self, user_id: str) -> bool:
-        """
-        Xóa một user theo ID. 
-        Trả về True nếu xóa thành công, False nếu không tìm thấy ID.
-        """
         if not ObjectId.is_valid(user_id):
             return False
-
         result = await self.collection.delete_one({"_id": ObjectId(user_id)})
-        
-        # result.deleted_count sẽ bằng 1 nếu tìm thấy và xóa thành công
         return result.deleted_count > 0
