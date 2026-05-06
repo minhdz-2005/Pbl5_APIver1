@@ -71,7 +71,7 @@ async def background_analyze_trend(request_id: str, db: AsyncIOMotorDatabase):
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                settings.AI_SERVER_URL, 
+                f"{settings.AI_SERVER_URL}/analyze-trend", 
                 json=payload, 
                 headers={"Content-Type": "application/json"},
                 timeout=120.0 # Timeout 2 phút đợi AI xử lý

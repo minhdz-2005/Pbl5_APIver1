@@ -6,11 +6,12 @@ from app.repositories.analysis_repository import AnalysisRepository
 from app.repositories.design_repository import DesignRepository
 from app.schemas.analysis_request import RequestStatus
 from app.schemas.generated_design import GeneratedDesignCreate
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # URL của Webserver AI tạo ảnh (bạn có thể thay đổi đường dẫn cho phù hợp)
-AI_GENERATE_URL = "https://72af-113-22-31-214.ngrok-free.app/api/v1/generate-images"
+AI_GENERATE_URL = f"{settings.AI_SERVER_URL}/generate-designs"
 
 async def background_generate_images(
     request_id: str, 
