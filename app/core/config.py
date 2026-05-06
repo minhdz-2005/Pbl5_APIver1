@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     MONGO_DETAILS: str = Field(..., alias="DATABASE_URL")
     DATABASE_NAME: str = "pbl5"
 
+    # AI Server Configuration
+    AI_SERVER_URL: str = Field(..., env="AI_SERVER_URL")  # URL của Webserver AI, lấy từ biến môi trường
+
     # Pydantic Settings Config
     model_config = SettingsConfigDict(
         env_file=".env", 

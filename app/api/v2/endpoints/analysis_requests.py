@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List
 from bson import ObjectId
+from pydantic import BaseModel, Field
 
 from app.core.database import get_database
 from app.repositories.analysis_repository import AnalysisRepository
@@ -13,6 +14,8 @@ from app.schemas.analysis_request import (
     AnalysisRequestUpdate,
     RequestStatus
 )
+from app.services.analyze_trend import background_analyze_trend
+from app.services.generate_images import background_generate_images
 
 router = APIRouter()
 
@@ -20,11 +23,13 @@ router = APIRouter()
 @router.post("/", response_model=AnalysisRequestRead, status_code=status.HTTP_201_CREATED)
 async def create_analysis_request(
     req_in: AnalysisRequestCreate, 
+    background_tasks: BackgroundTasks, # Khai báo BackgroundTasks ở đây
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
     Tạo một yêu cầu phân tích mới. 
-    Trạng thái mặc định sẽ là 'PENDING' theo Model định nghĩa.
+    Trạng thái mặc định sẽ là 'PENDING'.
+    Sau khi tạo, một tiến trình ngầm sẽ tự động kích hoạt để gửi dữ liệu sang AI Server.
     """
     # Kiểm tra project_id có hợp lệ không
     if not ObjectId.is_valid(req_in.project_id):
@@ -36,7 +41,13 @@ async def create_analysis_request(
         raise HTTPException(status_code=404, detail="Không tìm thấy Project tương ứng")
 
     repo = AnalysisRepository(db)
-    return await repo.create(req_in)
+    new_request = await repo.create(req_in)
+    
+    # KÍCH HOẠT TIẾN TRÌNH CHẠY NGẦM
+    # Truyền request_id vừa tạo và biến db vào để hàm service xử lý độc lập phía sau
+    background_tasks.add_task(background_analyze_trend, new_request["id"], db)
+
+    return new_request
 
 # --- 2. LẤY DANH SÁCH YÊU CẦU THEO PROJECT ---
 @router.get("/project/{project_id}", response_model=List[AnalysisRequestRead])
@@ -318,4 +329,45 @@ async def get_analysis_results(
     return {
         "trend_summary": trend_summary,
         "generated_designs": designs
+    }
+
+# Schema cho request body (Dựa theo yêu cầu của bạn)
+class ImageGenerationRequest(BaseModel):
+    request_id: str = Field(..., description="ID của phiên phân tích")
+    target_style_prompt: str = Field(..., description="Prompt phong cách thiết kế")
+    seed_image_urls: List[str] = Field(..., description="Danh sách các URL ảnh đầu vào")
+    num_images: int = Field(3, ge=1, le=10, description="Số lượng ảnh cần tạo")
+
+@router.post("/requests/generate_images", status_code=status.HTTP_202_ACCEPTED)
+async def request_generate_images(
+    payload: ImageGenerationRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Kích hoạt tiến trình AI tạo ảnh độc lập.
+    """
+    req_id = payload.request_id
+    
+    # 1. Kiểm tra xem request này có tồn tại trong DB không
+    if not ObjectId.is_valid(req_id):
+        raise HTTPException(status_code=400, detail="request_id không hợp lệ")
+        
+    analysis_req = await db["analysis_requests"].find_one({"_id": ObjectId(req_id)})
+    if not analysis_req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
+
+    # 2. Đăng ký chạy ngầm
+    background_tasks.add_task(
+        background_generate_images,
+        request_id=req_id,
+        target_style_prompt=payload.target_style_prompt,
+        seed_image_urls=payload.seed_image_urls,
+        num_images=payload.num_images,
+        db=db
+    )
+
+    return {
+        "status": "GENERATING_IMAGES",
+        "message": "Đã ghi nhận. AI đang tiến hành vẽ ảnh, bạn có thể theo dõi trạng thái qua endpoint status."
     }
