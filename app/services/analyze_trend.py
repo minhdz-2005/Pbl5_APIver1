@@ -90,12 +90,12 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
             base_img = top_trend.get("source_image_url")
 
             # Kích hoạt luôn bước sinh ảnh
-            await request_ai_image_generation(
-                request_id=request_id,
-                db=db,
-                target_style_prompt=f"A fashion design inspired by {style_prompt}",
-                base_image_url=base_img
-            )
+            # await request_ai_image_generation(
+            #     request_id=request_id,
+            #     db=db,
+            #     target_style_prompt=f"A fashion design inspired by {style_prompt}",
+            #     base_image_url=base_img
+            # )
 
         # 6. Cập nhật trạng thái hoàn thành
         await db["analysis_requests"].update_one(

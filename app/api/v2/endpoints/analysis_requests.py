@@ -211,20 +211,17 @@ from app.schemas.credit_transaction import CreditTransactionCreate, TransactionT
 @router.post("/{request_id}/generate", status_code=status.HTTP_200_OK)
 async def trigger_generation(
     request_id: str,
-    data_in: dict, # Nhận selected_trend_ids và target_style_id
+    data_in: dict, 
+    background_tasks: BackgroundTasks, # Sử dụng BackgroundTasks để không làm treo UI
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
-    Kích hoạt quy trình tạo ảnh AI:
-    1. Kiểm tra số dư credit của User sở hữu project.
-    2. Trừ 10 credits.
-    3. Cập nhật style và các ảnh trend đã chọn vào Request.
-    4. Chuyển trạng thái sang GENERATING_IMAGES.
+    Kích hoạt quy trình tạo ảnh AI với đầy đủ tham số tùy chỉnh.
     """
     if not ObjectId.is_valid(request_id):
         raise HTTPException(status_code=400, detail="ID yêu cầu không hợp lệ")
 
-    # 1. Lấy thông tin Request và Project để biết User là ai
+    # 1. Lấy thông tin Request và Project
     analysis_req = await db["analysis_requests"].find_one({"_id": ObjectId(request_id)})
     if not analysis_req:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
@@ -240,7 +237,7 @@ async def trigger_generation(
             detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
         )
 
-    # 3. Thực hiện trừ Credit (Sử dụng TransactionRepository)
+    # 3. Trừ Credit
     tx_repo = TransactionRepository(db)
     tx_create = CreditTransactionCreate(
         user_id=user_id,
@@ -250,24 +247,54 @@ async def trigger_generation(
     )
     await tx_repo.create_transaction(tx_create)
 
-    # 4. Cập nhật Request với Style và Trend đã chọn
+    # 4. Lấy thông tin chi tiết để chuẩn bị cho AI
+    # Lấy Style Prompt từ collection 'styles' (giả định bạn có collection này)
+    style_id = data_in.get("target_style_id")
+    style_doc = await db["styles"].find_one({"_id": ObjectId(style_id)})
+    style_prompt = style_doc.get("prompt", "Professional fashion photography") if style_doc else "Fashion design"
+
+    # Lấy ảnh gốc (Base Image) từ một trong các trend được chọn hoặc từ kết quả phân tích
+    # Ở đây mình lấy URL của ảnh trend đầu tiên được người dùng chọn làm base
+    selected_trend_ids = data_in.get("selected_trend_ids", [])
+    base_image_url = "https://example.com/default-base.jpg" # Dự phòng
+    
+    if selected_trend_ids:
+        # Tìm trong trend_results đã lưu ở bước trước
+        first_trend = await db["trend_results"].find_one({"_id": ObjectId(selected_trend_ids[0])})
+        if first_trend:
+            base_image_url = str(first_trend.get("source_image_url"))
+
+    # 5. Cập nhật Request vào Database
     await db["analysis_requests"].update_one(
         {"_id": ObjectId(request_id)},
         {
             "$set": {
-                "target_style_id": str(data_in.get("target_style_id")),
-                "selected_trend_image_ids": [str(i) for i in data_in.get("selected_trend_ids", [])],
+                "target_style_id": str(style_id),
+                "selected_trend_image_ids": [str(i) for i in selected_trend_ids],
                 "status": "GENERATING_IMAGES",
                 "updated_at": datetime.now(timezone.utc)
             }
         }
     )
 
-    # 5. [Ghi chú] Tại đây bạn sẽ gọi sang AI Service để bắt đầu vẽ ảnh
-    # ... logic call AI ...
+    # 6. GỌI AI SERVICE (Chạy ngầm)
+    # Lấy các thông số bối cảnh người dùng chọn (Season, Weather,...) từ data_in
+    background_tasks.add_task(
+        request_ai_image_generation,
+        db=db,
+        request_id=request_id,
+        target_style_prompt=style_prompt,
+        base_image_url=base_image_url,
+        target_season=data_in.get("target_season", "Summer"),
+        target_audience=data_in.get("target_audience", "General"),
+        target_weather=data_in.get("target_weather", "Sunny"),
+        num_images=data_in.get("num_images", 4),
+        seed=data_in.get("seed", 42)
+    )
 
     return {
         "status": "GENERATING_IMAGES",
+        "message": "Đang tiến hành tạo ảnh thiết kế...",
         "credits_deducted": 10,
         "remaining_credits": user.get("available_credits", 0) - 10
     }
