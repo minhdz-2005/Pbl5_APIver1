@@ -14,3 +14,4 @@ api_router.include_router(projects.router, prefix="/projects", tags=["Projects V
 api_router.include_router(style_presets.router, prefix="/style_presets", tags=["Style Presets V2"])
 api_router.include_router(trend_insights.router, prefix="/trend_insights", tags=["Trend Insights V2"])
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing V2"])
+api_router.include_router(trend_insights.router, prefix="/trend-results", tags=["Trend Results V2"])

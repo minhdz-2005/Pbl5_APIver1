@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     lifespan=lifespan,
-   # dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_user)]
 )
 
 # 3. Đăng ký các Router (Endpoints)
