@@ -74,7 +74,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
             ai_result = response.json()
 
         # 5. Xử lý kết quả trả về và lưu vào database
-        # Giả sử bạn lưu kết quả vào collection 'trend_results'
+        # lưu kết quả vào collection 'trend_results'
         trends = ai_result.get("trends", [])
         if trends:
             await db["trend_results"].insert_many([
