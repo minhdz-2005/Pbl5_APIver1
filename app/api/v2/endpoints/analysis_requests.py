@@ -14,8 +14,8 @@ from app.schemas.analysis_request import (
     AnalysisRequestUpdate,
     RequestStatus
 )
-from app.services.analyze_trend import background_analyze_trend
-from app.services.generate_images import background_generate_images
+from app.services.analyze_trend import call_ai_trend_analysis
+from app.services.generate_images import request_ai_image_generation
 
 router = APIRouter()
 
@@ -23,29 +23,28 @@ router = APIRouter()
 @router.post("/", response_model=AnalysisRequestRead, status_code=status.HTTP_201_CREATED)
 async def create_analysis_request(
     req_in: AnalysisRequestCreate, 
-    background_tasks: BackgroundTasks, # Khai báo BackgroundTasks ở đây
+    background_tasks: BackgroundTasks, 
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
-    Tạo một yêu cầu phân tích mới. 
-    Trạng thái mặc định sẽ là 'PENDING'.
-    Sau khi tạo, một tiến trình ngầm sẽ tự động kích hoạt để gửi dữ liệu sang AI Server.
+    Tạo một yêu cầu phân tích mới và kích hoạt AI phân tích ngầm.
     """
-    # Kiểm tra project_id có hợp lệ không
+    # 1. Kiểm tra project_id có hợp lệ không
     if not ObjectId.is_valid(req_in.project_id):
         raise HTTPException(status_code=400, detail="project_id không hợp lệ")
 
-    # Kiểm tra Project có tồn tại không
+    # 2. Kiểm tra Project có tồn tại không
     project = await db["projects"].find_one({"_id": ObjectId(req_in.project_id)})
     if not project:
         raise HTTPException(status_code=404, detail="Không tìm thấy Project tương ứng")
 
+    # 3. Lưu yêu cầu vào Database
     repo = AnalysisRepository(db)
     new_request = await repo.create(req_in)
     
-    # KÍCH HOẠT TIẾN TRÌNH CHẠY NGẦM
-    # Truyền request_id vừa tạo và biến db vào để hàm service xử lý độc lập phía sau
-    background_tasks.add_task(background_analyze_trend, new_request["id"], db)
+    # 4. KÍCH HOẠT TIẾN TRÌNH CHẠY NGẦM
+    # Chúng ta truyền ID của request vừa tạo vào background task
+    background_tasks.add_task(call_ai_trend_analysis, new_request.id, db)
 
     return new_request
 
@@ -331,43 +330,18 @@ async def get_analysis_results(
         "generated_designs": designs
     }
 
-# Schema cho request body (Dựa theo yêu cầu của bạn)
-class ImageGenerationRequest(BaseModel):
-    request_id: str = Field(..., description="ID của phiên phân tích")
-    target_style_prompt: str = Field(..., description="Prompt phong cách thiết kế")
-    seed_image_urls: List[str] = Field(..., description="Danh sách các URL ảnh đầu vào")
-    num_images: int = Field(3, ge=1, le=10, description="Số lượng ảnh cần tạo")
-
-@router.post("/requests/generate_images", status_code=status.HTTP_202_ACCEPTED)
-async def request_generate_images(
-    payload: ImageGenerationRequest,
-    background_tasks: BackgroundTasks,
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """
-    Kích hoạt tiến trình AI tạo ảnh độc lập.
-    """
-    req_id = payload.request_id
+@router.post("/callback/image-result")
+async def ai_callback_handler(data: dict, db: AsyncIOMotorDatabase = Depends(get_database)):
+    req_id = data.get("request_id")
+    images = data.get("generated_images") # Giả sử AI trả về list URL ảnh
     
-    # 1. Kiểm tra xem request này có tồn tại trong DB không
-    if not ObjectId.is_valid(req_id):
-        raise HTTPException(status_code=400, detail="request_id không hợp lệ")
-        
-    analysis_req = await db["analysis_requests"].find_one({"_id": ObjectId(req_id)})
-    if not analysis_req:
-        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
-
-    # 2. Đăng ký chạy ngầm
-    background_tasks.add_task(
-        background_generate_images,
-        request_id=req_id,
-        target_style_prompt=payload.target_style_prompt,
-        seed_image_urls=payload.seed_image_urls,
-        num_images=payload.num_images,
-        db=db
+    # Cập nhật ảnh vào DB và đổi trạng thái sang COMPLETED
+    await db["analysis_requests"].update_one(
+        {"_id": ObjectId(req_id)},
+        {"$set": {
+            "result_images": images,
+            "status": "COMPLETED",
+            "updated_at": datetime.utcnow()
+        }}
     )
-
-    return {
-        "status": "GENERATING_IMAGES",
-        "message": "Đã ghi nhận. AI đang tiến hành vẽ ảnh, bạn có thể theo dõi trạng thái qua endpoint status."
-    }
+    return {"status": "success"}

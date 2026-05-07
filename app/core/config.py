@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # AI Server Configuration
     AI_SERVER_URL: str = Field(..., env="AI_SERVER_URL")  # URL của Webserver AI, lấy từ biến môi trường
 
+    # Backend Server Configuration
+    BACKEND_URL: str = Field(..., env="BACKEND_URL")
+
+
     # Pydantic Settings Config
     model_config = SettingsConfigDict(
         env_file=".env", 

@@ -1,78 +1,64 @@
-import logging
 import httpx
-from datetime import datetime, timezone
+import logging
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from app.repositories.analysis_repository import AnalysisRepository
-from app.repositories.design_repository import DesignRepository
-from app.schemas.analysis_request import RequestStatus
-from app.schemas.generated_design import GeneratedDesignCreate
+from bson import ObjectId
+from datetime import datetime
 from app.core.config import settings
+
+# URL endpoint sinh ảnh của AI Server
+AI_IMAGE_GEN_URL = f"{settings.AI_SERVER_URL}/generate-images"
+# URL của chính server bạn để AI gọi lại khi làm xong ảnh
+MY_CALLBACK_URL = f"{settings.BACKEND_URL}/api/v2/analysis_requests/callback/image-result"
 
 logger = logging.getLogger(__name__)
 
-# URL của Webserver AI tạo ảnh (bạn có thể thay đổi đường dẫn cho phù hợp)
-AI_GENERATE_URL = f"{settings.AI_SERVER_URL}/generate-designs"
-
-async def background_generate_images(
-    request_id: str, 
-    target_style_prompt: str, 
-    seed_image_urls: list, 
-    num_images: int, 
-    db: AsyncIOMotorDatabase
-):
+async def request_ai_image_generation(request_id: str, db: AsyncIOMotorDatabase, target_style_prompt: str, base_image_url: str):
     """
-    Tiến trình ngầm (Background Task) thực hiện việc tạo ảnh AI:
-    1. Chuyển trạng thái sang GENERATING_IMAGES.
-    2. Gửi request đến Webserver AI.
-    3. Lưu các thiết kế nhận được vào bảng generated_designs.
-    4. Cập nhật trạng thái COMPLETED (hoặc FAILED nếu thất bại).
+    Gửi yêu cầu sinh ảnh tới AI Server dựa trên phong cách đã chọn.
     """
-    repo = AnalysisRepository(db)
-    design_repo = DesignRepository(db)
-
     try:
-        # Bước 1: Cập nhật trạng thái đang tạo ảnh
-        logger.info(f"Starting image generation for request {request_id}")
-        await repo.update_status(request_id, RequestStatus.GENERATING_IMAGES.value)
+        # 1. Cập nhật trạng thái sang GENERATING_IMAGES
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {"status": "GENERATING_IMAGES", "updated_at": datetime.utcnow()}}
+        )
 
+        # 2. Chuẩn bị Payload
         payload = {
-            "request_id": request_id,
+            "request_id": str(request_id),
             "target_style_prompt": target_style_prompt,
-            "seed_image_urls": seed_image_urls,
-            "num_images": num_images
+            "target_season": "Summer",  # Có thể lấy từ project setting nếu có
+            "target_audience": "General",
+            "target_weather": "Sunny",
+            "base_image_url": base_image_url,
+            "num_images": 4,
+            "callback_url": MY_CALLBACK_URL,
+            "seed": 42, # Bạn có thể random số này
+            "canny_low_threshold": 100,
+            "canny_high_threshold": 200
         }
 
-        # Bước 2: Gửi request tới AI Server
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                AI_GENERATE_URL,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=300.0 # Tăng timeout lên 5 phút cho tác vụ tạo ảnh
-            )
+        # 3. Gọi AI Server
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(AI_IMAGE_GEN_URL, json=payload)
+            response.raise_for_status()
+            result = response.json()
 
-        if response.status_code in [200, 201]:
-            ai_data = response.json()
-            logger.info(f"Image generation successful for request {request_id}")
-            
-            # Giả định AI Server trả về mảng các url ảnh trong trường "designs" hoặc "images"
-            generated_designs = ai_data.get("designs", [])
-            
-            # Lưu kết quả vào DB
-            for img_url in generated_designs:
-                design_create = GeneratedDesignCreate(
-                    request_id=request_id,
-                    design_image_url=img_url
-                )
-                await design_repo.create(design_create)
-            
-            # Bước 3: Cập nhật trạng thái hoàn thành
-            await repo.update_status(request_id, RequestStatus.COMPLETED.value)
-            logger.info(f"Request {request_id} status updated to COMPLETED")
-        else:
-            logger.error(f"AI Server returned error {response.status_code}: {response.text}")
-            await repo.update_status(request_id, RequestStatus.FAILED.value)
+        # 4. Lưu job_id vào request để theo dõi sau này nếu cần
+        job_id = result.get("job_id")
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {
+                "ai_job_id": job_id,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        logger.info(f"Successfully triggered image gen for req {request_id}, Job ID: {job_id}")
 
     except Exception as e:
-        logger.error(f"Error during image generation for {request_id}: {str(e)}")
-        await repo.update_status(request_id, RequestStatus.FAILED.value)
+        logger.error(f"Error calling AI Image Gen for {request_id}: {str(e)}")
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {"status": "FAILED", "updated_at": datetime.utcnow()}}
+        )

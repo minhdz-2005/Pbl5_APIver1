@@ -1,10 +1,11 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.security import get_current_user
 from app.api.v1.router import api_router
 from app.api.v2.router import api_router as api_router_v2
 
@@ -28,7 +29,8 @@ async def lifespan(app: FastAPI):
 # 2. Khởi tạo ứng dụng FastAPI
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    lifespan=lifespan
+    lifespan=lifespan,
+   # dependencies=[Depends(get_current_user)]
 )
 
 # 3. Đăng ký các Router (Endpoints)
