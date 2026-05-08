@@ -46,7 +46,7 @@ async def create_analysis_request(
     
     # 4. KÍCH HOẠT TIẾN TRÌNH CHẠY NGẦM
     # Chúng ta truyền ID của request vừa tạo vào background task
-    background_tasks.add_task(call_ai_trend_analysis, new_request.id, db)
+    background_tasks.add_task(call_ai_trend_analysis, new_request["_id"], db)
 
     return new_request
 
@@ -144,7 +144,7 @@ async def discover_trends(
     # Hiện tại chúng ta cứ trả về theo yêu cầu của FE:
     
     return {
-        "request_id": new_request["id"], # Hoặc new_request["_id"] tùy repo trả về
+        "request_id": new_request["_id"], # Hoặc new_request["_id"] tùy repo trả về
         "status": new_request["status"],
         "message": "Đã ghi nhận. AI đang chuẩn bị cào dữ liệu."
     }

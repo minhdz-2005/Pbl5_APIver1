@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.services.generate_images import request_ai_image_generation
 
 # Giả định URL AI Server, bạn nên đưa vào file .env
-AI_SERVER_URL = f"{settings.AI_SERVER_URL}/analyze-trends"
+AI_SERVER_URL = f"{settings.AI_SERVER_URL}/analyze-trend"
 
 logger = logging.getLogger(__name__)
 
@@ -33,31 +33,31 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
         # products_cursor = db["products"].find({"project_id": analysis_req["project_id"]}).limit(20)
         products_cursor = [
             {
-                "name": "Product A",
-                "image_url": "https://example.com/product_a.jpg",
-                "reviews": ["Good quality", "Loved it!"],
-                "scenario": "fashion_trend",
-                "sales_velocity": 100,
-                "created_at": datetime.utcnow()
+                "product_name": "Vest nam, Áo vets nam chất liệu KAKI thô dày dặn...", 
+                "image_url": "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg",
+                "reviews": [
+                    "Chất liệu KAKI thô dày dặn",
+                    "Ít nhăn, ít nhàu",
+                    "Kiểu dáng tay lỡ trẻ trung"
+                ],
+                "scenario": "Normal",
+                "sales_velocity": 78,
+                "created_at": "2026-05-07T20:00:00Z"
             },
-            {
-                "name": "Product B",
-                "image_url": "https://example.com/product_b.jpg",
-                "reviews": ["Not bad", "Could be better"],
-                "scenario": "fashion_trend",
-                "sales_velocity": 50,
-                "created_at": datetime.utcnow()
-            }
         ]
         products_data = []
-        async for p in products_cursor:
+        for p in products_cursor:
+            created_at = p.get("created_at", datetime.utcnow())
+            # Handle both string and datetime objects
+            created_at_str = created_at if isinstance(created_at, str) else created_at.isoformat()
+            
             products_data.append({
-                "product_name": p.get("name", ""),
+                "product_name": p.get("product_name", ""),  # Fix: use product_name, not name
                 "image_url": p.get("image_url", ""),
                 "reviews": p.get("reviews", []),
                 "scenario": p.get("scenario", "fashion_trend"),
                 "sales_velocity": p.get("sales_velocity", 0),
-                "created_at": p.get("created_at", datetime.utcnow()).isoformat()
+                "created_at": created_at_str
             })
 
         payload = {
@@ -68,6 +68,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
         }
 
         # 4. Gửi request tới AI Server
+        logger.info(f"Sending payload to AI server: {payload}")  # Debug: log payload
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(AI_SERVER_URL, json=payload)
             response.raise_for_status()
@@ -100,7 +101,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
         # 6. Cập nhật trạng thái hoàn thành
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
+            {"$set": {"status": "GENERATING_IMAGES", "updated_at": datetime.utcnow()}}
         )
 
     except Exception as e:
