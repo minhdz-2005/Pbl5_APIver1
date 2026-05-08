@@ -104,7 +104,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
         # 6. Cập nhật trạng thái hoàn thành
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
+            {"$set": {"status": "GENERATING_IMAGES", "updated_at": datetime.utcnow()}}
         )
 
     except Exception as e:
