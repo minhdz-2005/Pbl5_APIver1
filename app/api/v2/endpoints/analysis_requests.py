@@ -259,30 +259,31 @@ async def trigger_generation(
     # await tx_repo.create_transaction(tx_create)
 
     # 4. Lấy Style Prompt từ collection 'style_presets'
-    if not ObjectId.is_valid(data_in.target_style_id):
-        raise HTTPException(status_code=400, detail="ID style không hợp lệ")
+    # if not ObjectId.is_valid(data_in.target_style_id):
+    #     raise HTTPException(status_code=400, detail="ID style không hợp lệ")
     
-    style_doc = await db["style_presets"].find_one({"_id": ObjectId(data_in.target_style_id)})
-    style_prompt = style_doc.get("prompt", "Professional fashion photography") if style_doc else "Fashion design"
+    # style_doc = await db["style_presets"].find_one({"_id": ObjectId(data_in.target_style_id)})
+    # style_prompt = style_doc.get("prompt", "Professional fashion photography") if style_doc else "Fashion design"
 
     # 5. Lấy ảnh gốc (Base Image) từ trend_results
-    base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
-    
-    if data_in.selected_trend_ids and len(data_in.selected_trend_ids) > 0:
-        first_trend_id = data_in.selected_trend_ids[0]
-        # Kiểm tra ID có hợp lệ không
-        if ObjectId.is_valid(first_trend_id):
-            first_trend = await db["trend_results"].find_one({"_id": ObjectId(first_trend_id)})
-            if first_trend and first_trend.get("source_image_url"):
-                base_image_url = str(first_trend.get("source_image_url"))
+    # base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
+    base_image_url = data_in.base_image_url  # Lấy từ input của người dùng
+
+    # if data_in.selected_trend_ids and len(data_in.selected_trend_ids) > 0:
+    #     first_trend_id = data_in.selected_trend_ids[0]
+    #     # Kiểm tra ID có hợp lệ không
+    #     if ObjectId.is_valid(first_trend_id):
+    #         first_trend = await db["trend_results"].find_one({"_id": ObjectId(first_trend_id)})
+    #         if first_trend and first_trend.get("source_image_url"):
+    #             base_image_url = str(first_trend.get("source_image_url"))
 
     # 6. Cập nhật Request status
     await db["analysis_requests"].update_one(
         {"_id": ObjectId(request_id)},
         {
             "$set": {
-                "target_style_id": data_in.target_style_id,
-                "selected_trend_image_ids": data_in.selected_trend_ids,
+                # "target_style_id": data_in.target_style_id,
+                # "selected_trend_image_ids": data_in.selected_trend_ids,
                 "status": "GENERATING_IMAGES",
                 "updated_at": datetime.now(timezone.utc)
             }
@@ -294,7 +295,7 @@ async def trigger_generation(
         request_ai_image_generation,
         db=db,
         request_id=request_id,
-        target_style_prompt="dakaivest", # style_prompt,
+        # target_style_prompt="dakakivest", # style_prompt,
         base_image_url=base_image_url,
         target_season=data_in.target_season,
         target_audience=data_in.target_audience,

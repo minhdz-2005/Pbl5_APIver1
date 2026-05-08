@@ -21,8 +21,9 @@ class AnalysisRequestCreate(AnalysisRequestBase):
     pass
 
 class ImageGenerationRequest(BaseModel):
-    target_style_id: str
-    selected_trend_ids: List[str] = []
+    #target_style_id: str
+    #selected_trend_ids: List[str] = []
+    base_image_url: str
     target_season: Optional[str] = "Summer"
     target_audience: Optional[str] = "General"
     target_weather: Optional[str] = "Sunny"

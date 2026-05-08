@@ -68,12 +68,12 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
         }
 
         # 4. Gửi request tới AI Server
-        logger.info(f"Sending payload to AI server: {payload}")  # Debug: log payload
+        logger.warning(f"Sending payload to AI server: {payload}")  # Debug: log payload
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(AI_SERVER_URL, json=payload)
             response.raise_for_status()
             ai_result = response.json()
-
+        logger.warning("khfa")
         # 5. Xử lý kết quả trả về và lưu vào database
         # lưu kết quả vào collection 'trend_results'
         trends = ai_result.get("trends", [])
@@ -97,7 +97,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
             await request_ai_image_generation(
                 request_id=request_id,
                 db=db,
-                target_style_prompt=style_prompt,
+                # target_style_prompt=style_prompt,
                 base_image_url=base_img
             )
 

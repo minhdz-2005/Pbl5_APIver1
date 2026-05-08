@@ -23,19 +23,19 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
     """
     try:
         # 1. Gọi AI Server lấy thông tin Job
-        job_data = {}
-        while (job_data.get("status") != "succeeded" and job_data.get("status") != "failed"):
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
-                if response.status_code != 200:
-                    logger.error(f"Không thể lấy thông tin job {job_id} từ AI Server")
-                    return
-                job_data = response.json()
+        # job_data = {}
+        # while (job_data.get("status") != "succeeded" and job_data.get("status") != "failed"):
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
+            if response.status_code != 200:
+                logger.error(f"Không thể lấy thông tin job {job_id} từ AI Server")
+                return
+            job_data = response.json()
 
 
-                logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data.get('status')}")
+            logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data.get('status')}")
 
-        logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data}")
+        #logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data}")
         # 2. Kiểm tra danh sách ảnh trả về
         logger.warning("0")
         designs = job_data.get("generated_designs", [])
@@ -68,101 +68,33 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
         # 4. Cập nhật trạng thái cuối cùng cho Analysis Request
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "COMPLETED", "result_images": image_urls, "updated_at": datetime.utcnow()}}
+            {
+                "$set": {
+                    "status": "COMPLETED", 
+                    "updated_at": datetime.utcnow()
+                },
+                "$push": {
+                    "result_images": { "$each": image_urls } # Thêm từng URL trong list vào mảng hiện có
+                }
+            }
         )
         logger.warning(f"Hoàn tất đồng bộ {len(designs)} ảnh cho request {request_id}")
 
     except Exception as e:
         logger.error(f"Lỗi khi sync kết quả AI: {str(e)}")
 
-# async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorDatabase):
-#     """
-#     Đợi cho đến khi Job thành công rồi mới đồng bộ dữ liệu.
-#     """
-#     max_retries = 20  # Thử tối đa 20 lần
-#     retry_interval = 5  # Mỗi lần cách nhau 5 giây (Tổng cộng 100 giây chờ)
-    
-#     try:
-#         async with httpx.AsyncClient(timeout=30.0) as client:
-#             for i in range(max_retries):
-#                 # 1. Gọi AI Server lấy thông tin Job
-#                 response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
-#                 if response.status_code != 200:
-#                     logger.error(f"Không thể lấy thông tin job {job_id}. Status: {response.status_code}")
-#                     return
-
-#                 job_data = response.json()
-#                 current_status = job_data.get("status")
-
-#                 logger.info(f"Đang kiểm tra Job {job_id}: Trạng thái hiện tại = {current_status} (Lần thử {i+1})")
-
-#                 # NẾU THÀNH CÔNG: Thoát vòng lặp để xuống đoạn code xử lý lưu DB
-#                 if current_status == "succeeded":
-#                     logger.info(f"Job {job_id} đã hoàn thành!")
-#                     break
-                
-#                 # NẾU THẤT BẠI: Dừng luôn không cần đợi nữa
-#                 elif current_status == "failed":
-#                     logger.error(f"Job {job_id} bị lỗi phía AI Server: {job_data.get('error')}")
-#                     await db["analysis_requests"].update_one(
-#                         {"_id": ObjectId(request_id)},
-#                         {"$set": {"status": "FAILED", "updated_at": datetime.utcnow()}}
-#                     )
-#                     return
-
-#                 # NẾU VẪN ĐANG CHẠY: Nghỉ rồi lặp lại
-#                 await asyncio.sleep(retry_interval)
-#             else:
-#                 # Sau khi chạy hết vòng lặp mà vẫn không break (quá timeout)
-#                 logger.error(f"Job {job_id} quá thời gian chờ (Timeout).")
-#                 return
-
-#         # -----------------------------------------------------------
-#         # ĐOẠN DƯỚI NÀY CHỈ CHẠY KHI VÒNG LẶP TRÊN ĐÃ 'BREAK' (TỨC LÀ SUCCEEDED)
-#         # -----------------------------------------------------------
-
-#         # 2. Kiểm tra danh sách ảnh trả về
-#         designs = job_data.get("generated_designs", [])
-#         if not designs:
-#             logger.warning(f"Job {job_id} thành công nhưng không có ảnh trả về.")
-#             return
-
-#         # 3. Lưu từng thiết kế (Dùng headers nội bộ như bạn đã làm)
-#         # headers = {"Authorization": f"Bearer {settings.INTERNAL_API_TOKEN}"}
-        
-#         async with httpx.AsyncClient() as client:
-#             for design in designs:
-#                 payload = {
-#                     "request_id": str(request_id),
-#                     "design_image_url": design.get("url"),
-#                     "user_rating": 5,
-#                     "ai_metadata": job_data 
-#                 }
-#                 res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload)
-#                 if res.status_code != 201:
-#                     logger.error(f"Lưu design thất bại: {res.text}")
-
-#         # 4. Cập nhật trạng thái cuối cùng
-#         await db["analysis_requests"].update_one(
-#             {"_id": ObjectId(request_id)},
-#             {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
-#         )
-
-#     except Exception as e:
-#         logger.error(f"Lỗi khi sync kết quả AI: {str(e)}")
-
 async def request_ai_image_generation(
     db: AsyncIOMotorDatabase,
     request_id: str,
-    target_style_prompt: str,
-    base_image_url: str,
-    target_season: str = "Summer",
-    target_audience: str = "General",
-    target_weather: str = "Sunny",
+    # target_style_prompt: str,
+    base_image_url: str, # URL ảnh gốc để AI dựa vào đó tạo ra thiết kế mới
+    target_season: str = "Spring", # Mùa (ví dụ: "Spring", "Summer", "Autumn", "Winter") default là "Spring"
+    target_audience: str = "General", # Đối tượng khách hàng (ví dụ: "General", "Youth", "Professional") default là "General"
+    target_weather: str = "Rainy", # Thời tiết (ví dụ: "Sunny", "Rainy", "Snowy") default là "Rainy"
     num_images: int = 3,
     seed: int = 42,
-    canny_low_threshold: int = 100,
-    canny_high_threshold: int = 200
+    canny_low_threshold: int = 155,
+    canny_high_threshold: int = 255
 ):
     """
     Gửi yêu cầu sinh ảnh tới AI Server với các thông số tùy chỉnh.
@@ -181,7 +113,7 @@ async def request_ai_image_generation(
         # 2. Chuẩn bị Payload từ các tham số truyền vào
         payload = {
             "request_id": str(request_id),
-            "target_style_prompt": target_style_prompt,
+            "target_style_prompt": "dakakivest", # Tạm thời hardcode, sau này sẽ lấy từ style_presets
             "target_season": target_season,
             "target_audience": target_audience,
             "target_weather": target_weather,
