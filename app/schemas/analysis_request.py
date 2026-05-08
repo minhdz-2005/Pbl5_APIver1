@@ -14,7 +14,7 @@ class RequestStatus(str, Enum):
 class AnalysisRequestBase(BaseModel):
     project_id: str
     category_name: str
-    target_style_id: Optional[str] = None
+    # target_style_id: Optional[str] = None
     # selected_trend_image_ids: List[str] = []
 
 class AnalysisRequestCreate(AnalysisRequestBase):
