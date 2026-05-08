@@ -62,7 +62,7 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
 
         payload = {
             "request_id": str(request_id),
-            "category_keyword": analysis_req.get("category_name", ""),
+            "category_keyword": "Vest Nam", #analysis_req.get("category_name", ""),
             "products": products_data,
             "limit": 5
         }

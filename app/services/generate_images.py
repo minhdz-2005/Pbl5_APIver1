@@ -70,7 +70,7 @@ async def request_ai_image_generation(
     target_season: str = "Summer",
     target_audience: str = "General",
     target_weather: str = "Sunny",
-    num_images: int = 4,
+    num_images: int = 3,
     seed: int = 42,
     canny_low_threshold: int = 100,
     canny_high_threshold: int = 200
