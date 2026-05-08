@@ -12,7 +12,9 @@ from app.schemas.analysis_request import (
     AnalysisRequestCreate, 
     AnalysisRequestRead, 
     AnalysisRequestUpdate,
-    RequestStatus
+    RequestStatus,
+    ImageGenerationRequest,
+    AIImageCallbackData,
 )
 from app.services.analyze_trend import call_ai_trend_analysis
 from app.services.generate_images import request_ai_image_generation
@@ -211,7 +213,7 @@ from app.schemas.credit_transaction import CreditTransactionCreate, TransactionT
 @router.post("/{request_id}/generate", status_code=status.HTTP_200_OK)
 async def trigger_generation(
     request_id: str,
-    data_in: dict, 
+    data_in: ImageGenerationRequest,
     background_tasks: BackgroundTasks, # Sử dụng BackgroundTasks để không làm treo UI
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
@@ -358,9 +360,9 @@ async def get_analysis_results(
     }
 
 @router.post("/callback/image-result")
-async def ai_callback_handler(data: dict, db: AsyncIOMotorDatabase = Depends(get_database)):
-    req_id = data.get("request_id")
-    images = data.get("generated_images") # Giả sử AI trả về list URL ảnh
+async def ai_callback_handler(data: AIImageCallbackData, db: AsyncIOMotorDatabase = Depends(get_database)):
+    req_id = data.request_id
+    images = data.generated_images # Giả sử AI trả về list URL ảnh
     
     # Cập nhật ảnh vào DB và đổi trạng thái sang COMPLETED
     await db["analysis_requests"].update_one(

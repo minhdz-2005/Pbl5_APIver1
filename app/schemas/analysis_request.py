@@ -20,6 +20,19 @@ class AnalysisRequestBase(BaseModel):
 class AnalysisRequestCreate(AnalysisRequestBase):
     pass
 
+class ImageGenerationRequest(BaseModel):
+    target_style_id: str
+    selected_trend_ids: List[str] = []
+    target_season: Optional[str] = "Summer"
+    target_audience: Optional[str] = "General"
+    target_weather: Optional[str] = "Sunny"
+    num_images: Optional[int] = 4
+    seed: Optional[int] = 42
+
+class AIImageCallbackData(BaseModel):
+    request_id: str
+    generated_images: List[str] = []
+
 class AnalysisRequestUpdate(BaseModel):
     status: Optional[RequestStatus] = None
     selected_trend_image_ids: Optional[List[str]] = None
