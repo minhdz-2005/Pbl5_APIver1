@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List
 from bson import ObjectId
 from pydantic import BaseModel, Field
+import logging
 
 from app.core.database import get_database
 from app.repositories.analysis_repository import AnalysisRepository
@@ -18,6 +19,8 @@ from app.schemas.analysis_request import (
 )
 from app.services.analyze_trend import call_ai_trend_analysis
 from app.services.generate_images import request_ai_image_generation
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -66,7 +69,7 @@ async def list_analysis_requests_by_project(
     return await repo.get_by_project(project_id)
 
 # --- 3. LẤY CHI TIẾT MỘT YÊU CẦU ---
-@router.get("/{req_id}", response_model=AnalysisRequestRead)
+@router.get("/{req_id}")
 async def get_analysis_request(
     req_id: str, 
     db: AsyncIOMotorDatabase = Depends(get_database)
@@ -214,7 +217,7 @@ from app.schemas.credit_transaction import CreditTransactionCreate, TransactionT
 async def trigger_generation(
     request_id: str,
     data_in: ImageGenerationRequest,
-    background_tasks: BackgroundTasks, # Sử dụng BackgroundTasks để không làm treo UI
+    background_tasks: BackgroundTasks,
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """
@@ -229,69 +232,75 @@ async def trigger_generation(
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
     
     project = await db["projects"].find_one({"_id": ObjectId(analysis_req["project_id"])})
+    if not project:
+        raise HTTPException(status_code=404, detail="Không tìm thấy project")
+    
     user_id = project["user_id"]
 
     # 2. Kiểm tra số dư của User
     user = await db["users"].find_one({"_id": ObjectId(user_id)})
-    if user.get("available_credits", 0) < 10:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, 
-            detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
-        )
+    # if not user:
+    #     raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+    
+    # if user.get("available_credits", 0) < 10:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_402_PAYMENT_REQUIRED, 
+    #         detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
+    #     )
 
     # 3. Trừ Credit
-    tx_repo = TransactionRepository(db)
-    tx_create = CreditTransactionCreate(
-        user_id=user_id,
-        transaction_type=TransactionType.USAGE,
-        amount=-10,
-        related_request_id=request_id
-    )
-    await tx_repo.create_transaction(tx_create)
+    # tx_repo = TransactionRepository(db)
+    # tx_create = CreditTransactionCreate(
+    #     user_id=user_id,
+    #     transaction_type=TransactionType.USAGE,
+    #     amount=-10,
+    #     related_request_id=request_id
+    # )
+    # await tx_repo.create_transaction(tx_create)
 
-    # 4. Lấy thông tin chi tiết để chuẩn bị cho AI
-    # Lấy Style Prompt từ collection 'styles' (giả định bạn có collection này)
-    style_id = data_in.get("target_style_id")
-    style_doc = await db["styles"].find_one({"_id": ObjectId(style_id)})
+    # 4. Lấy Style Prompt từ collection 'style_presets'
+    if not ObjectId.is_valid(data_in.target_style_id):
+        raise HTTPException(status_code=400, detail="ID style không hợp lệ")
+    
+    style_doc = await db["style_presets"].find_one({"_id": ObjectId(data_in.target_style_id)})
     style_prompt = style_doc.get("prompt", "Professional fashion photography") if style_doc else "Fashion design"
 
-    # Lấy ảnh gốc (Base Image) từ một trong các trend được chọn hoặc từ kết quả phân tích
-    # Ở đây mình lấy URL của ảnh trend đầu tiên được người dùng chọn làm base
-    selected_trend_ids = data_in.get("selected_trend_ids", [])
-    base_image_url = "https://example.com/default-base.jpg" # Dự phòng
+    # 5. Lấy ảnh gốc (Base Image) từ trend_results
+    base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
     
-    if selected_trend_ids:
-        # Tìm trong trend_results đã lưu ở bước trước
-        first_trend = await db["trend_results"].find_one({"_id": ObjectId(selected_trend_ids[0])})
-        if first_trend:
-            base_image_url = str(first_trend.get("source_image_url"))
+    if data_in.selected_trend_ids and len(data_in.selected_trend_ids) > 0:
+        first_trend_id = data_in.selected_trend_ids[0]
+        # Kiểm tra ID có hợp lệ không
+        if ObjectId.is_valid(first_trend_id):
+            first_trend = await db["trend_results"].find_one({"_id": ObjectId(first_trend_id)})
+            if first_trend and first_trend.get("source_image_url"):
+                base_image_url = str(first_trend.get("source_image_url"))
 
-    # 5. Cập nhật Request vào Database
+    # 6. Cập nhật Request status
     await db["analysis_requests"].update_one(
         {"_id": ObjectId(request_id)},
         {
             "$set": {
-                "target_style_id": str(style_id),
-                "selected_trend_image_ids": [str(i) for i in selected_trend_ids],
+                "target_style_id": data_in.target_style_id,
+                "selected_trend_image_ids": data_in.selected_trend_ids,
                 "status": "GENERATING_IMAGES",
                 "updated_at": datetime.now(timezone.utc)
             }
         }
     )
 
-    # 6. GỌI AI SERVICE (Chạy ngầm)
-    # Lấy các thông số bối cảnh người dùng chọn (Season, Weather,...) từ data_in
+    # 7. Gọi AI service ngầm
     background_tasks.add_task(
         request_ai_image_generation,
         db=db,
         request_id=request_id,
-        target_style_prompt=style_prompt,
+        target_style_prompt="dakaivest", # style_prompt,
         base_image_url=base_image_url,
-        target_season=data_in.get("target_season", "Summer"),
-        target_audience=data_in.get("target_audience", "General"),
-        target_weather=data_in.get("target_weather", "Sunny"),
-        num_images=data_in.get("num_images", 4),
-        seed=data_in.get("seed", 42)
+        target_season=data_in.target_season,
+        target_audience=data_in.target_audience,
+        target_weather=data_in.target_weather,
+        num_images=data_in.num_images,
+        seed=data_in.seed
     )
 
     return {
@@ -360,17 +369,85 @@ async def get_analysis_results(
     }
 
 @router.post("/callback/image-result")
-async def ai_callback_handler(data: AIImageCallbackData, db: AsyncIOMotorDatabase = Depends(get_database)):
-    req_id = data.request_id
-    images = data.generated_images # Giả sử AI trả về list URL ảnh
-    
-    # Cập nhật ảnh vào DB và đổi trạng thái sang COMPLETED
-    await db["analysis_requests"].update_one(
-        {"_id": ObjectId(req_id)},
-        {"$set": {
-            "result_images": images,
-            "status": "COMPLETED",
-            "updated_at": datetime.utcnow()
-        }}
-    )
+async def ai_callback_handler(
+    request: Request, 
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Xử lý Webhook từ AI Server.
+    Đón nhận kết quả trả về và cập nhật vào hệ thống.
+    """
+    # 1. Đọc dữ liệu JSON
+    try:
+        data = await request.json()
+        logger.info(f"AI Callback Data: {data}") 
+    except Exception as e:
+        logger.error(f"Invalid JSON in Callback: {str(e)}")
+        return {"status": "error", "message": "Invalid JSON"}
+
+    # 2. Lấy các thông tin định danh
+    request_id = data.get("request_id")
+    job_id = data.get("job_id")
+    job_status = data.get("status") # Trạng thái job từ AI: 'succeeded', 'failed',...
+
+    if not request_id or not ObjectId.is_valid(request_id):
+        logger.error(f"Callback fail: request_id không hợp lệ ({request_id})")
+        return {"status": "error", "message": "Invalid request_id"}
+
+    # 3. Xử lý theo từng trạng thái của Job
+    if job_status == "failed":
+        logger.error(f"AI Job {job_id} thất bại. Error: {data.get('error')}")
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {
+                "status": "FAILED",
+                "ai_error": data.get("error"),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        return {"status": "recorded_failure"}
+
+    # 4. Trường hợp thành công (succeeded)
+    if job_status == "succeeded":
+        logger.warning(f"AI Job {job_id} thành công. Đang xử lý kết quả...")
+        
+         # Cập nhật trạng thái của Request sang COMPLETED tạm thời
+        # Lấy danh sách ảnh từ các field có thể có
+        designs = data.get("generated_designs") or data.get("generated_images") or []
+        
+        if not designs:
+            logger.warning(f"Job {job_id} succeeded nhưng không có ảnh.")
+            return {"status": "no_images"}
+
+        # Cập nhật danh sách ảnh vào Analysis Request
+        image_urls = [d.get("url") if isinstance(d, dict) else d for d in designs]
+        
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {
+                "status": "COMPLETED",
+                "result_images": image_urls,
+                "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        # 5. Lưu từng ảnh vào collection 'generated_designs'
+        # Đây là nơi bạn tận dụng Dynamic Schema
+        design_documents = []
+        for d in designs:
+            img_url = d.get("url") if isinstance(d, dict) else d
+            design_documents.append({
+                "request_id": str(request_id),
+                "design_image_url": img_url,
+                "user_rating": 5,
+                "ai_job_id": job_id,
+                "ai_metadata": data, # Lưu metadata của cả job vào từng ảnh
+                "created_at": datetime.utcnow()
+            })
+        
+        if design_documents:
+            await db["generated_designs"].insert_many(design_documents)
+            logger.info(f"Đã lưu {len(design_documents)} thiết kế cho request {request_id}")
+
     return {"status": "success"}

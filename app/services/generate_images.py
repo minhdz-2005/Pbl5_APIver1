@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import logging
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -6,7 +8,7 @@ from datetime import datetime
 from app.core.config import settings
 
 # --- Cấu hình Endpoint ---
-AI_IMAGE_GEN_URL = f"{settings.AI_SERVER_URL}/generate-images"
+AI_IMAGE_GEN_URL = f"{settings.AI_SERVER_URL}/generate-design"
 AI_JOB_DETAIL_URL = f"{settings.AI_SERVER_URL}/generation-jobs"
 # URL gọi nội bộ tới route POST của bạn
 INTERNAL_DESIGN_POST_URL = f"{settings.BACKEND_URL}/api/v2/generated_designs/"
@@ -21,14 +23,21 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
     """
     try:
         # 1. Gọi AI Server lấy thông tin Job
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
-            if response.status_code != 200:
-                logger.error(f"Không thể lấy thông tin job {job_id} từ AI Server")
-                return
-            job_data = response.json()
+        job_data = {}
+        while (job_data.get("status") != "succeeded" and job_data.get("status") != "failed"):
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
+                if response.status_code != 200:
+                    logger.error(f"Không thể lấy thông tin job {job_id} từ AI Server")
+                    return
+                job_data = response.json()
 
+
+                logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data.get('status')}")
+
+        logger.warning(f"Thông tin chi tiết từ AI Server cho job {job_id}: {job_data}")
         # 2. Kiểm tra danh sách ảnh trả về
+        logger.warning("0")
         designs = job_data.get("generated_designs", [])
         if not designs:
             logger.warning(f"Job {job_id} chưa có thiết kế nào được sinh ra.")
@@ -36,8 +45,12 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
 
         # 3. Lưu từng thiết kế vào collection nội bộ qua route POST
         # Lưu ý: Cần truyền Token vào Header nếu main.py yêu cầu Auth
-        headers = {"Authorization": f"Bearer {settings.INTERNAL_API_TOKEN}"} # Giả định bạn có token nội bộ
-        
+        # headers = {"Authorization": f"Bearer {settings.INTERNAL_API_TOKEN}"} # Giả định bạn có token nội bộ
+        logger.warning("1")
+        image_urls = []
+        for design in designs:
+            image_urls.append(design.get("url"))
+
         async with httpx.AsyncClient() as client:
             for design in designs:
                 payload = {
@@ -48,19 +61,95 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
                     "ai_metadata": job_data 
                 }
                 
-                res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload, headers=headers)
+                res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload)
                 if res.status_code != 201:
                     logger.error(f"Lưu design vào DB thất bại: {res.text}")
-
+        logger.warning("2")
         # 4. Cập nhật trạng thái cuối cùng cho Analysis Request
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
+            {"$set": {"status": "COMPLETED", "result_images": image_urls, "updated_at": datetime.utcnow()}}
         )
-        logger.info(f"Hoàn tất đồng bộ {len(designs)} ảnh cho request {request_id}")
+        logger.warning(f"Hoàn tất đồng bộ {len(designs)} ảnh cho request {request_id}")
 
     except Exception as e:
         logger.error(f"Lỗi khi sync kết quả AI: {str(e)}")
+
+# async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorDatabase):
+#     """
+#     Đợi cho đến khi Job thành công rồi mới đồng bộ dữ liệu.
+#     """
+#     max_retries = 20  # Thử tối đa 20 lần
+#     retry_interval = 5  # Mỗi lần cách nhau 5 giây (Tổng cộng 100 giây chờ)
+    
+#     try:
+#         async with httpx.AsyncClient(timeout=30.0) as client:
+#             for i in range(max_retries):
+#                 # 1. Gọi AI Server lấy thông tin Job
+#                 response = await client.get(f"{AI_JOB_DETAIL_URL}/{job_id}")
+#                 if response.status_code != 200:
+#                     logger.error(f"Không thể lấy thông tin job {job_id}. Status: {response.status_code}")
+#                     return
+
+#                 job_data = response.json()
+#                 current_status = job_data.get("status")
+
+#                 logger.info(f"Đang kiểm tra Job {job_id}: Trạng thái hiện tại = {current_status} (Lần thử {i+1})")
+
+#                 # NẾU THÀNH CÔNG: Thoát vòng lặp để xuống đoạn code xử lý lưu DB
+#                 if current_status == "succeeded":
+#                     logger.info(f"Job {job_id} đã hoàn thành!")
+#                     break
+                
+#                 # NẾU THẤT BẠI: Dừng luôn không cần đợi nữa
+#                 elif current_status == "failed":
+#                     logger.error(f"Job {job_id} bị lỗi phía AI Server: {job_data.get('error')}")
+#                     await db["analysis_requests"].update_one(
+#                         {"_id": ObjectId(request_id)},
+#                         {"$set": {"status": "FAILED", "updated_at": datetime.utcnow()}}
+#                     )
+#                     return
+
+#                 # NẾU VẪN ĐANG CHẠY: Nghỉ rồi lặp lại
+#                 await asyncio.sleep(retry_interval)
+#             else:
+#                 # Sau khi chạy hết vòng lặp mà vẫn không break (quá timeout)
+#                 logger.error(f"Job {job_id} quá thời gian chờ (Timeout).")
+#                 return
+
+#         # -----------------------------------------------------------
+#         # ĐOẠN DƯỚI NÀY CHỈ CHẠY KHI VÒNG LẶP TRÊN ĐÃ 'BREAK' (TỨC LÀ SUCCEEDED)
+#         # -----------------------------------------------------------
+
+#         # 2. Kiểm tra danh sách ảnh trả về
+#         designs = job_data.get("generated_designs", [])
+#         if not designs:
+#             logger.warning(f"Job {job_id} thành công nhưng không có ảnh trả về.")
+#             return
+
+#         # 3. Lưu từng thiết kế (Dùng headers nội bộ như bạn đã làm)
+#         # headers = {"Authorization": f"Bearer {settings.INTERNAL_API_TOKEN}"}
+        
+#         async with httpx.AsyncClient() as client:
+#             for design in designs:
+#                 payload = {
+#                     "request_id": str(request_id),
+#                     "design_image_url": design.get("url"),
+#                     "user_rating": 5,
+#                     "ai_metadata": job_data 
+#                 }
+#                 res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload)
+#                 if res.status_code != 201:
+#                     logger.error(f"Lưu design thất bại: {res.text}")
+
+#         # 4. Cập nhật trạng thái cuối cùng
+#         await db["analysis_requests"].update_one(
+#             {"_id": ObjectId(request_id)},
+#             {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
+#         )
+
+#     except Exception as e:
+#         logger.error(f"Lỗi khi sync kết quả AI: {str(e)}")
 
 async def request_ai_image_generation(
     db: AsyncIOMotorDatabase,
@@ -120,7 +209,7 @@ async def request_ai_image_generation(
             }}
         )
         
-        logger.info(f"Đã tạo AI Job: {job_id} cho Request: {request_id}")
+        logger.warning(f"Đã tạo AI Job: {job_id} cho Request: {request_id}")
         
         # 5. Kích hoạt đồng bộ kết quả (Sync)
         # Lưu ý: Hàm này sẽ fetch data từ AI Server và lưu vào collection 'generated_designs'

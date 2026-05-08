@@ -85,23 +85,26 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
 
             # Lấy trend có score cao nhất để làm mẫu tạo ảnh
             top_trend = max(trends, key=lambda x: x.get("trend_score", 0))
+
+            # in ra top trend ra terminal
+            logger.warning(f"Top trend from AI analysis: {top_trend}")
             
             # Tạo một prompt từ các keyword của trend
-            style_prompt = ", ".join(top_trend.get("style_keywords", []))
+            style_prompt = "".join(top_trend.get("style_keywords", []))
             base_img = top_trend.get("source_image_url")
 
             # Kích hoạt luôn bước sinh ảnh
-            # await request_ai_image_generation(
-            #     request_id=request_id,
-            #     db=db,
-            #     target_style_prompt=f"A fashion design inspired by {style_prompt}",
-            #     base_image_url=base_img
-            # )
+            await request_ai_image_generation(
+                request_id=request_id,
+                db=db,
+                target_style_prompt=style_prompt,
+                base_image_url=base_img
+            )
 
         # 6. Cập nhật trạng thái hoàn thành
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "GENERATING_IMAGES", "updated_at": datetime.utcnow()}}
+            {"$set": {"status": "COMPLETED", "updated_at": datetime.utcnow()}}
         )
 
     except Exception as e:
