@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
@@ -15,3 +17,17 @@ class UserResponse(BaseModel):
 class LoginResponse(BaseModel):
     token: str
     user: UserResponse
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    role: str
+
+class RegisterResponse(BaseModel):
+    id: str
+    email: str
+    username: str
+    role: str
+    available_credits: int
+    created_at: datetime

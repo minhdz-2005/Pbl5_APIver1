@@ -40,20 +40,20 @@ async def get_my_info_test(
     }
 
 # --- 2. TẠO USER MỚI ---
-@router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    user_in: UserCreate, 
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    repo = UserRepository(db) #
+# @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+# async def create_user(
+#     user_in: UserCreate, 
+#     db: AsyncIOMotorDatabase = Depends(get_database)
+# ):
+#     repo = UserRepository(db) #
     
-    if await repo.check_email_exists(user_in.email): #
-        raise HTTPException(status_code=400, detail="Email đã được đăng ký")
+#     if await repo.check_email_exists(user_in.email): #
+#         raise HTTPException(status_code=400, detail="Email đã được đăng ký")
     
-    if await repo.check_username_exists(user_in.username): #
-        raise HTTPException(status_code=400, detail="Tên người dùng đã tồn tại")
+#     if await repo.check_username_exists(user_in.username): #
+#         raise HTTPException(status_code=400, detail="Tên người dùng đã tồn tại")
     
-    return await repo.create(user_in) # Trả về UserRead với credits mặc định là 10
+#     return await repo.create(user_in) # Trả về UserRead với credits mặc định là 10
 
 # --- 3. LIÊT KÊ TẤT CẢ USER ---
 @router.get("/", response_model=List[UserRead])
