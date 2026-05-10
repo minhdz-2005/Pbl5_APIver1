@@ -435,20 +435,20 @@ async def ai_callback_handler(
 
         # 5. Lưu từng ảnh vào collection 'generated_designs'
         # Đây là nơi bạn tận dụng Dynamic Schema
-        design_documents = []
-        for d in designs:
-            img_url = d.get("url") if isinstance(d, dict) else d
-            design_documents.append({
-                "request_id": str(request_id),
-                "design_image_url": img_url,
-                "user_rating": 5,
-                "ai_job_id": job_id,
-                "ai_metadata": data, # Lưu metadata của cả job vào từng ảnh
-                "created_at": datetime.utcnow()
-            })
+        # design_documents = []
+        # for d in designs:
+        #     img_url = d.get("url") if isinstance(d, dict) else d
+        #     design_documents.append({
+        #         "request_id": str(request_id),
+        #         "design_image_url": img_url,
+        #         "user_rating": 5,
+        #         "ai_job_id": job_id,
+        #         "ai_metadata": data, # Lưu metadata của cả job vào từng ảnh
+        #         "created_at": datetime.utcnow()
+        #     })
         
-        if design_documents:
-            await db["generated_designs"].insert_many(design_documents)
-            logger.info(f"Đã lưu {len(design_documents)} thiết kế cho request {request_id}")
+        # if design_documents:
+        #     await db["generated_designs"].insert_many(design_documents)
+        #     logger.info(f"Đã lưu {len(design_documents)} thiết kế cho request {request_id}")
 
     return {"status": "success"}

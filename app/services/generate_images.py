@@ -51,19 +51,19 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
         for design in designs:
             image_urls.append(design.get("url"))
 
-        async with httpx.AsyncClient() as client:
-            for design in designs:
-                payload = {
-                    "request_id": str(request_id),
-                    "design_image_url": design.get("url"),
-                    "user_rating": 5,
-                    # Tận dụng Dynamic Schema: lưu toàn bộ thông tin gốc từ AI vào đây
-                    "ai_metadata": job_data 
-                }
+        # async with httpx.AsyncClient() as client:
+        #     for design in designs:
+        #         payload = {
+        #             "request_id": str(request_id),
+        #             "design_image_url": design.get("url"),
+        #             "user_rating": 5,
+        #             # Tận dụng Dynamic Schema: lưu toàn bộ thông tin gốc từ AI vào đây
+        #             "ai_metadata": job_data 
+        #         }
                 
-                res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload)
-                if res.status_code != 201:
-                    logger.error(f"Lưu design vào DB thất bại: {res.text}")
+        #         res = await client.post(INTERNAL_DESIGN_POST_URL, json=payload)
+        #         if res.status_code != 201:
+        #             logger.error(f"Lưu design vào DB thất bại: {res.text}")
         logger.warning("2")
         # 4. Cập nhật trạng thái cuối cùng cho Analysis Request
         await db["analysis_requests"].update_one(
