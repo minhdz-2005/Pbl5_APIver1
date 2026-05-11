@@ -294,12 +294,14 @@ async def trigger_generation(
     await db["generated_designs"].insert_one({
         "request_id": str(request_id),
         "status": "GENERATING_IMAGES",
-        "design_image_url": base_image_url, # Tạm thời lưu ảnh gốc, sau này sẽ update lại khi có ảnh AI trả về
-        "user_rating": None,
-        "ai_job_id": None,
-        "ai_metadata": None,
-        "created_at": datetime.utcnow()
-        })
+        "image_data": {
+            "design_image_url": base_image_url, # Tạm thời lưu ảnh gốc, sau này sẽ update lại khi có ảnh AI trả về
+            "user_rating": None,
+            "ai_job_id": None,
+            "ai_metadata": None,
+            "created_at": datetime.utcnow()
+        }
+    })
 
 
     # 7. Gọi AI service ngầm
@@ -469,14 +471,23 @@ async def ai_callback_handler(
             # cập nhật generated_designs thay vì insert mới để tránh trùng lặp khi AI callback nhiều lần cho cùng một request_id
             await db["generated_designs"].update_one(
                 {"request_id": str(request_id)},
-                {"$set": {
-                    "status": "COMPLETED",
-                    "design_image_url": image_urls,
-                    "user_rating": 5,
-                    "ai_job_id": job_id,
-                    "ai_metadata": data,
-                    "updated_at": datetime.utcnow()
-                }},
+                {
+                    "$set": {
+                        "status": "COMPLETED",
+                        "updated_at": datetime.utcnow()
+                    }
+                },
+                {
+                    "$push": {
+                        "image_data": {
+                            "design_image_url": image_urls,
+                            "user_rating": 5,
+                            "ai_job_id": job_id,
+                            "ai_metadata": data,
+                            "created_at": datetime.utcnow()
+                        }
+                    }
+                },
                 upsert=True
             )
             logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
