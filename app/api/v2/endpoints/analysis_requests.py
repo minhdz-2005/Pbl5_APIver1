@@ -311,63 +311,63 @@ async def trigger_generation(
         "remaining_credits": user.get("available_credits", 0) - 10
     }
 
-@router.get("/{request_id}/results", response_model=dict)
-async def get_analysis_results(
-    request_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """
-    Lấy kết quả cuối cùng của phiên phân tích bao gồm:
-    - trend_summary: Dữ liệu thống kê để vẽ biểu đồ.
-    - generated_designs: Danh sách các mẫu thiết kế do AI tạo ra.
-    """
-    if not ObjectId.is_valid(request_id):
-        raise HTTPException(status_code=400, detail="ID yêu cầu không hợp lệ")
+# @router.get("/{request_id}/results", response_model=dict)
+# async def get_analysis_results(
+#     request_id: str,
+#     db: AsyncIOMotorDatabase = Depends(get_database)
+# ):
+#     """
+#     Lấy kết quả cuối cùng của phiên phân tích bao gồm:
+#     - trend_summary: Dữ liệu thống kê để vẽ biểu đồ.
+#     - generated_designs: Danh sách các mẫu thiết kế do AI tạo ra.
+#     """
+#     if not ObjectId.is_valid(request_id):
+#         raise HTTPException(status_code=400, detail="ID yêu cầu không hợp lệ")
 
-    # 1. Kiểm tra Request có tồn tại không
-    analysis_req = await db["analysis_requests"].find_one({"_id": ObjectId(request_id)})
-    if not analysis_req:
-        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
+#     # 1. Kiểm tra Request có tồn tại không
+#     analysis_req = await db["analysis_requests"].find_one({"_id": ObjectId(request_id)})
+#     if not analysis_req:
+#         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu phân tích")
 
-    # 2. Lấy dữ liệu trend_summary (Dựa trên Trend_Insight)
-    # Ở đây mình giả sử bạn muốn thống kê tỷ lệ tích cực trung bình hoặc danh sách sản phẩm hot
-    trend_insights_cursor = db["trend_insights"].find({"request_id": request_id})
-    insights = []
-    avg_positive = 0
-    total_reviews = 0
+#     # 2. Lấy dữ liệu trend_summary (Dựa trên Trend_Insight)
+#     # Ở đây mình giả sử bạn muốn thống kê tỷ lệ tích cực trung bình hoặc danh sách sản phẩm hot
+#     trend_insights_cursor = db["trend_insights"].find({"request_id": request_id})
+#     insights = []
+#     avg_positive = 0
+#     total_reviews = 0
     
-    async for insight in trend_insights_cursor:
-        insights.append({
-            "product_name": insight.get("product_name"),
-            "positive_rate": insight.get("positive_rate"),
-            "total_reviews": insight.get("total_reviews")
-        })
-        avg_positive += insight.get("positive_rate", 0)
-        total_reviews += insight.get("total_reviews", 0)
+#     async for insight in trend_insights_cursor:
+#         insights.append({
+#             "product_name": insight.get("product_name"),
+#             "positive_rate": insight.get("positive_rate"),
+#             "total_reviews": insight.get("total_reviews")
+#         })
+#         avg_positive += insight.get("positive_rate", 0)
+#         total_reviews += insight.get("total_reviews", 0)
 
-    # Tính toán sơ bộ cho trend_summary (FE dùng vẽ chart)
-    trend_summary = {
-        "total_analyzed": len(insights),
-        "average_positive_rate": round(avg_positive / len(insights), 2) if insights else 0,
-        "total_market_reviews": total_reviews,
-        "details": insights
-    }
+#     # Tính toán sơ bộ cho trend_summary (FE dùng vẽ chart)
+#     trend_summary = {
+#         "total_analyzed": len(insights),
+#         "average_positive_rate": round(avg_positive / len(insights), 2) if insights else 0,
+#         "total_market_reviews": total_reviews,
+#         "details": insights
+#     }
 
-    # 3. Lấy danh sách ảnh AI đã tạo từ bảng generated_designs
-    designs = []
-    designs_cursor = db["generated_designs"].find({"request_id": request_id})
-    async for design in designs_cursor:
-        designs.append({
-            "id": str(design["_id"]),
-            "image_url": design.get("design_image_url"),
-            "user_rating": design.get("user_rating")
-        })
+#     # 3. Lấy danh sách ảnh AI đã tạo từ bảng generated_designs
+#     designs = []
+#     designs_cursor = db["generated_designs"].find({"request_id": request_id})
+#     async for design in designs_cursor:
+#         designs.append({
+#             "id": str(design["_id"]),
+#             "image_url": design.get("design_image_url"),
+#             "user_rating": design.get("user_rating")
+#         })
 
-    # 4. Trả về kết quả tổng hợp
-    return {
-        "trend_summary": trend_summary,
-        "generated_designs": designs
-    }
+#     # 4. Trả về kết quả tổng hợp
+#     return {
+#         "trend_summary": trend_summary,
+#         "generated_designs": designs
+#     }
 
 @router.post("/callback/image-result")
 async def ai_callback_handler(

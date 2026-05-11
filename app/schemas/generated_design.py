@@ -4,7 +4,7 @@ from typing import Optional
 
 class GeneratedDesignBase(BaseModel):
     request_id: str
-    design_image_url: str
+    design_image_url: list[str]  # mảng URL ảnh thiết kế được sinh ra từ AI Server
     user_rating: Optional[int] = Field(None, ge=1, le=5)
 
 class GeneratedDesignCreate(GeneratedDesignBase):
