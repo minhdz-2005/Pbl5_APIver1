@@ -435,16 +435,23 @@ async def ai_callback_handler(
 
         # Cập nhật danh sách ảnh vào Analysis Request
         image_urls = [d.get("url") if isinstance(d, dict) else d for d in designs]
-        
-        await db["analysis_requests"].update_one(
+
+        existing_request = await db["analysis_requests"].find_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {
-                "status": "COMPLETED",
-                "result_images": image_urls,
-                # "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
-                "updated_at": datetime.utcnow()
-            }}
+            {"result_images": 1}
         )
+        if not existing_request or not existing_request.get("result_images"):
+            await db["analysis_requests"].update_one(
+                {"_id": ObjectId(request_id)},
+                {"$set": {
+                    "status": "COMPLETED",
+                    "result_images": image_urls,
+                    # "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+        else:
+            logger.info(f"result_images for request {request_id} already exists; skipping update.")
 
         # 5. Lưu từng ảnh vào collection 'generated_designs'
         # Đây là nơi bạn tận dụng Dynamic Schema
