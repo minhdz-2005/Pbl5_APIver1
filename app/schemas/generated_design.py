@@ -4,7 +4,11 @@ from typing import Optional
 
 class GeneratedDesignBase(BaseModel):
     request_id: str
+    ai_job_id: str
+    ai_metadata: dict
     design_image_url: list[str]  # mảng URL ảnh thiết kế được sinh ra từ AI Server
+    status: str
+    updated_at: datetime
     user_rating: Optional[int] = Field(None, ge=1, le=5)
 
 class GeneratedDesignCreate(GeneratedDesignBase):
@@ -15,7 +19,6 @@ class GeneratedDesignUpdate(BaseModel):
 
 class GeneratedDesignRead(GeneratedDesignBase):
     id: str = Field(..., alias="_id")
-    created_at: datetime
 
     model_config = ConfigDict(
         from_attributes=True,
