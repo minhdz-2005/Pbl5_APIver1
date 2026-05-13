@@ -291,16 +291,16 @@ async def trigger_generation(
     )
 
     #  tạo một generated_designs và lưu trạng thái "GENERATING_IMAGES" vào đó luôn để FE có thể hiển thị ngay mà không phải đợi callback từ AI Server
-    await db["generated_designs"].insert_one({
-        "request_id": str(request_id),
-        "status": "GENERATING_IMAGES",
-        "design_image_url": [base_image_url],
-        "user_rating": None,
-        "ai_job_id": None,
-        "ai_metadata": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    })
+    # await db["generated_designs"].insert_one({
+    #     "request_id": str(request_id),
+    #     "status": "GENERATING_IMAGES",
+    #     "design_image_url": [base_image_url],
+    #     "user_rating": None,
+    #     "ai_job_id": None,
+    #     "ai_metadata": None,
+    #     "created_at": datetime.utcnow(),
+    #     "updated_at": datetime.utcnow()
+    # })
 
 
     # 7. Gọi AI service ngầm
