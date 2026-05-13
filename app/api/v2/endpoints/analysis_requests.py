@@ -441,8 +441,8 @@ async def ai_callback_handler(
             {"_id": ObjectId(request_id)},
             {"$set": {
                 "status": "COMPLETED",
-                "result_images": image_urls,
-                "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
+                # "result_images": image_urls,
+                # "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
                 "updated_at": datetime.utcnow()
             }}
         )
@@ -450,10 +450,10 @@ async def ai_callback_handler(
         # 5. Lưu từng ảnh vào collection 'generated_designs'
         # Đây là nơi bạn tận dụng Dynamic Schema
         design_documents = []
-        image_urls=[]
-        for d in designs:
-            img_url = d.get("url") if isinstance(d, dict) else d
-            image_urls.append(img_url)
+        # image_urls=[]
+        # for d in designs:
+        #     img_url = d.get("url") if isinstance(d, dict) else d
+        #     image_urls.append(img_url)
 
         design_documents.append({
             "request_id": str(request_id),
