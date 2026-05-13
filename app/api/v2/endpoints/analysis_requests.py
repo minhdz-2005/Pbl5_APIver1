@@ -278,17 +278,20 @@ async def trigger_generation(
     #             base_image_url = str(first_trend.get("source_image_url"))
 
     # 6. Cập nhật Request status
-    await db["analysis_requests"].update_one(
-        {"_id": ObjectId(request_id)},
-        {
-            "$set": {
-                # "target_style_id": data_in.target_style_id,
-                # "selected_trend_image_ids": data_in.selected_trend_ids,
-                "status": "GENERATING_IMAGES",
-                "updated_at": datetime.now(timezone.utc)
+    if analysis_req.get("status") != "COMPLETED":
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {
+                "$set": {
+                    # "target_style_id": data_in.target_style_id,
+                    # "selected_trend_image_ids": data_in.selected_trend_ids,
+                    "status": "GENERATING_IMAGES",
+                    "updated_at": datetime.now(timezone.utc)
+                }
             }
-        }
-    )
+        )
+    else:
+        logger.info(f"Request {request_id} is already COMPLETED; skipping status update.")
 
     #  tạo một generated_designs và lưu trạng thái "GENERATING_IMAGES" vào đó luôn để FE có thể hiển thị ngay mà không phải đợi callback từ AI Server
     # await db["generated_designs"].insert_one({
