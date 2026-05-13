@@ -294,13 +294,12 @@ async def trigger_generation(
     await db["generated_designs"].insert_one({
         "request_id": str(request_id),
         "status": "GENERATING_IMAGES",
-        "image_data": {
-            "design_image_url": base_image_url, # Tạm thời lưu ảnh gốc, sau này sẽ update lại khi có ảnh AI trả về
-            "user_rating": None,
-            "ai_job_id": None,
-            "ai_metadata": None,
-            "created_at": datetime.utcnow()
-        }
+        "design_image_url": [base_image_url],
+        "user_rating": None,
+        "ai_job_id": None,
+        "ai_metadata": None,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
     })
 
 
@@ -450,10 +449,10 @@ async def ai_callback_handler(
         # 5. Lưu từng ảnh vào collection 'generated_designs'
         # Đây là nơi bạn tận dụng Dynamic Schema
         design_documents = []
-        # image_urls=[]
-        # for d in designs:
-        #     img_url = d.get("url") if isinstance(d, dict) else d
-        #     image_urls.append(img_url)
+        image_urls=[]
+        for d in designs:
+            img_url = d.get("url") if isinstance(d, dict) else d
+            image_urls.append(img_url)
 
         design_documents.append({
             "request_id": str(request_id),
@@ -474,18 +473,11 @@ async def ai_callback_handler(
                 {
                     "$set": {
                         "status": "COMPLETED",
+                        "design_image_url": image_urls,
+                        "user_rating": 5,
+                        "ai_job_id": job_id,
+                        "ai_metadata": data,
                         "updated_at": datetime.utcnow()
-                    }
-                },
-                {
-                    "$push": {
-                        "image_data": {
-                            "design_image_url": image_urls,
-                            "user_rating": 5,
-                            "ai_job_id": job_id,
-                            "ai_metadata": data,
-                            "created_at": datetime.utcnow()
-                        }
                     }
                 },
                 upsert=True
