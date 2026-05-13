@@ -440,7 +440,7 @@ async def ai_callback_handler(
             {"_id": ObjectId(request_id)},
             {"$set": {
                 "status": "COMPLETED",
-                # "result_images": image_urls,
+                "result_images": image_urls,
                 # "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
                 "updated_at": datetime.utcnow()
             }}
