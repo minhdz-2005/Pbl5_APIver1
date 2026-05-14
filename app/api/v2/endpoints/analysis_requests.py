@@ -305,6 +305,20 @@ async def trigger_generation(
     #     "updated_at": datetime.utcnow()
     # })
 
+    existing_design = await db["generated_designs"].find_one({"request_id": str(request_id)})
+    if existing_design:
+        await db["generated_designs"].update_one(
+            {"request_id": str(request_id)},
+            {
+                "$set": {
+                    "status": "GENERATING_IMAGES",
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+    else:
+        logger.info(f"No existing generated_design for request {request_id}; skipping update.")
+
 
     # 7. Gọi AI service ngầm
     background_tasks.add_task(
@@ -483,11 +497,13 @@ async def ai_callback_handler(
                 {
                     "$set": {
                         "status": "COMPLETED",
-                        "design_image_url": image_urls,
                         "user_rating": 5,
                         "ai_job_id": job_id,
                         "ai_metadata": data,
                         "updated_at": datetime.utcnow()
+                    },
+                    "$push": {
+                        "design_image_url": {"$each": image_urls}
                     }
                 },
                 upsert=True
