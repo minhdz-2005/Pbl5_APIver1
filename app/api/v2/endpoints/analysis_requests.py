@@ -453,6 +453,8 @@ async def ai_callback_handler(
         # Cập nhật danh sách ảnh vào Analysis Request
         image_urls = [d.get("url") if isinstance(d, dict) else d for d in designs]
 
+        analyzed=False
+
         existing_request = await db["analysis_requests"].find_one(
             {"_id": ObjectId(request_id)},
             {"result_images": 1}
@@ -462,11 +464,12 @@ async def ai_callback_handler(
                 {"_id": ObjectId(request_id)},
                 {"$set": {
                     "status": "COMPLETED",
-                    # "result_images": image_urls,
+                    "result_images": image_urls,
                     # "ai_callback_raw": data, # Lưu lại toàn bộ cục data để trace
                     "updated_at": datetime.utcnow()
                 }}
             )
+            analyzed=True
         else:
             logger.info(f"result_images for request {request_id} already exists; skipping update.")
 
@@ -492,23 +495,24 @@ async def ai_callback_handler(
             # logger.info(f"Đã lưu {len(design_documents)} thiết kế cho request {request_id}")
 
             # cập nhật generated_designs thay vì insert mới để tránh trùng lặp khi AI callback nhiều lần cho cùng một request_id
-            await db["generated_designs"].update_one(
-                {"request_id": str(request_id)},
-                {
-                    "$set": {
-                        "status": "COMPLETED",
-                        "user_rating": 5,
-                        "ai_job_id": job_id,
-                        "ai_metadata": data,
-                        "updated_at": datetime.utcnow()
+            if not analyzed:
+                await db["generated_designs"].update_one(
+                    {"request_id": str(request_id)},
+                    {
+                        "$set": {
+                            "status": "COMPLETED",
+                            "user_rating": 5,
+                            "ai_job_id": job_id,
+                            "ai_metadata": data,
+                            "updated_at": datetime.utcnow()
+                        },
+                        "$push": {
+                            "design_image_url": {"$each": image_urls}
+                        }
                     },
-                    "$push": {
-                        "design_image_url": {"$each": image_urls}
-                    }
-                },
-                upsert=True
-            )
-            logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
+                    upsert=True
+                )
+                logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
 
 
 
