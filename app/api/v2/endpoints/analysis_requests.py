@@ -20,6 +20,8 @@ from app.schemas.analysis_request import (
 from app.services.analyze_trend import call_ai_trend_analysis
 from app.services.generate_images import request_ai_image_generation
 
+from bson import ObjectId
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -523,10 +525,24 @@ async def ai_callback_handler(
             if not analyzed:
                 # upload ảnh lên Cloudinary và cập nhật URL mới vào generated_designs
                 from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
+
+                # 1. Tạo một generated designs mới, hứng lấy kết quả trả về
+                insert_result = await db["generated_designs"].insert_one({
+                    "request_id": str(request_id),
+                    "status": "GENERATING_IMAGES",
+                    "design_image_url": [],  # Đổi thành mảng rỗng để tí nữa dùng $push không bị lỗi data type
+                    "user_rating": 5,
+                    "ai_job_id": job_id,
+                    "ai_metadata": data, # Lưu metadata của cả job vào từng ảnh
+                    "created_at": datetime.utcnow(),
+                })
+
+                # 2. Lấy CHÍNH XÁC ID của bản ghi vừa tạo (Generated Design ID)
+                generated_design_id = str(insert_result.inserted_id)
                 
                 cloudinary_urls = []
                 for img_url in image_urls:
-                    result = await upload_image_to_cloudinary("generated_designs", img_url, str(request_id))
+                    result = await upload_image_to_cloudinary("generated_designs", img_url, generated_design_id)
                     # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
                     c_url = result.get("cloudinary_url")
                     if c_url:
@@ -540,7 +556,7 @@ async def ai_callback_handler(
                 image_urls = cloudinary_urls
 
                 await db["generated_designs"].update_one(
-                    {"request_id": str(request_id)},
+                    {"_id": ObjectId(generated_design_id)},
                     {
                         "$set": {
                             "status": "COMPLETED",
