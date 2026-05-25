@@ -461,22 +461,22 @@ async def ai_callback_handler(
         )
         if not existing_request or not existing_request.get("result_images"):
             # upload ảnh lên Cloudinary và cập nhật URL mới vào analysis_requests
-            from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
+            # from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
             
-            cloudinary_urls = []
-            for img_url in image_urls:
-                result = await upload_image_to_cloudinary(folder="analysis_requests", image_url=img_url, generated_design_id=str(request_id))
-                # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
-                c_url = result.get("cloudinary_url")
-                if c_url:
-                    cloudinary_urls.append(c_url)
-                    logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
-                else:
-                    logger.error("Upload failed for %s: %s", img_url, result.get("error"))
-                    cloudinary_urls.append(img_url)  # fallback to original URL
+            # cloudinary_urls = []
+            # for img_url in image_urls:
+            #     result = await upload_image_to_cloudinary(folder="analysis_requests", image_url=img_url, generated_design_id=str(request_id))
+            #     # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
+            #     c_url = result.get("cloudinary_url")
+            #     if c_url:
+            #         cloudinary_urls.append(c_url)
+            #         logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
+            #     else:
+            #         logger.error("Upload failed for %s: %s", img_url, result.get("error"))
+            #         cloudinary_urls.append(img_url)  # fallback to original URL
 
-            # replace the image_urls list with the Cloudinary URLs (or fallbacks)
-            image_urls = cloudinary_urls
+            # # replace the image_urls list with the Cloudinary URLs (or fallbacks)
+            # image_urls = cloudinary_urls
 
             await db["analysis_requests"].update_one(
                 {"_id": ObjectId(request_id)},
@@ -525,44 +525,44 @@ async def ai_callback_handler(
                 from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
 
                 # 1. Tạo một generated designs mới, hứng lấy kết quả trả về
-                # insert_result = await db["generated_designs"].insert_one({
-                #     "request_id": str(request_id),
-                #     "status": "GENERATING_IMAGES",
-                #     "design_image_url": [],  # Đổi thành mảng rỗng để tí nữa dùng $push không bị lỗi data type
-                #     "user_rating": 5,
-                #     "ai_job_id": job_id,
-                #     "ai_metadata": data,
-                #     "created_at": datetime.utcnow(),
-                #     "updated_at": datetime.utcnow(),
-                # })
+                insert_result = await db["generated_designs"].insert_one({
+                    "request_id": str(request_id),
+                    "status": "GENERATING_IMAGES",
+                    "design_image_url": [],  # Đổi thành mảng rỗng để tí nữa dùng $push không bị lỗi data type
+                    "user_rating": 5,
+                    "ai_job_id": job_id,
+                    "ai_metadata": data,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                })
                 
                 # 2. Lấy CHÍNH XÁC ID của bản ghi vừa tạo (Generated Design ID)
-                # generated_design_id = str(insert_result.inserted_id)
-                # logger.info(f"Đã tạo mới generated_designs với ID: {generated_design_id} cho request {request_id}")
+                generated_design_id = str(insert_result.inserted_id)
+                logger.info(f"Đã tạo mới generated_designs với ID: {generated_design_id} cho request {request_id}")
 
                 # 3. Duyệt qua danh sách ảnh để upload lên Cloudinary bằng generated_design_id vừa lấy
-                # cloudinary_urls = []
-                # for img_url in image_urls:
-                #     # TRUYỀN ĐÚNG generated_design_id thay vì request_id
-                #     result = await upload_image_to_cloudinary(
-                #         folder="generated_designs", 
-                #         image_url=img_url, 
-                #         generated_design_id=generated_design_id
-                #     )
+                cloudinary_urls = []
+                for img_url in image_urls:
+                    # TRUYỀN ĐÚNG generated_design_id thay vì request_id
+                    result = await upload_image_to_cloudinary(
+                        folder="generated_designs", 
+                        image_url=img_url, 
+                        generated_design_id=generated_design_id
+                    )
                     
-                #     c_url = result.get("cloudinary_url")
-                #     if c_url:
-                #         cloudinary_urls.append(c_url)
-                #         logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
-                #     else:
-                #         logger.error("Upload failed for %s: %s", img_url, result.get("error"))
-                #         cloudinary_urls.append(img_url)  # fallback to original URL
+                    c_url = result.get("cloudinary_url")
+                    if c_url:
+                        cloudinary_urls.append(c_url)
+                        logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
+                    else:
+                        logger.error("Upload failed for %s: %s", img_url, result.get("error"))
+                        cloudinary_urls.append(img_url)  # fallback to original URL
 
-                # # Gán lại mảng danh sách URL ảnh đã upload thành công
-                # image_urls = cloudinary_urls
+                # Gán lại mảng danh sách URL ảnh đã upload thành công
+                image_urls = cloudinary_urls
 
                 await db["generated_designs"].update_one(
-                    {"request_id": str(request_id)},
+                    {"_id": ObjectId(generated_design_id)}, # Tìm chính xác theo document ID thay vì tìm theo request_id chung chung
                     {
                         "$set": {
                             "status": "COMPLETED",
@@ -572,10 +572,9 @@ async def ai_callback_handler(
                             "updated_at": datetime.utcnow()
                         },
                         "$push": {
-                            "design_image_url": {"$each": image_urls}
+                            "design_image_url": {"$each": image_urls} # Đẩy mảng URL ảnh vào mảng rỗng ban đầu
                         }
-                    },
-                    upsert=True
+                    }
                 )
                 # logger.info(f"Đã cập nhật danh sách ảnh cho generated_design {generated_design_id}")
 
