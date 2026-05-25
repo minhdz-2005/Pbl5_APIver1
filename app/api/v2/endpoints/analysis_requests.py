@@ -50,7 +50,7 @@ async def create_analysis_request(
     # kiểm tra credit của user
     user = await db["users"].find_one({"_id": ObjectId(project["user_id"])}, {"available_credits": 1})
     credits = user.get("available_credits", 0) if user else 0
-    if not credits or credits.get("available_credits", 0) < 10:
+    if not credits or user.get("available_credits", 0) < 10:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED, 
             detail="Bạn không đủ credit để thực hiện phân tích (Cần 10 credits)"
