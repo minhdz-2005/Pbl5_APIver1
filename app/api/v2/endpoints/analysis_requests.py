@@ -303,7 +303,6 @@ async def trigger_generation(
     )
     await transaction_repo.create_transaction(transaction)
     
-    
     # base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
     base_image_url = data_in.base_image_url  # Lấy từ input của người dùng
 
