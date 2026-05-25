@@ -9,6 +9,8 @@ import logging
 
 from app.core.database import get_database
 from app.repositories.analysis_repository import AnalysisRepository
+from app.repositories.transaction_repository import TransactionRepository
+from app.schemas.credit_transaction import CreditTransactionCreate, TransactionType
 from app.schemas.analysis_request import (
     AnalysisRequestCreate, 
     AnalysisRequestRead, 
@@ -55,6 +57,23 @@ async def create_analysis_request(
             status_code=status.HTTP_402_PAYMENT_REQUIRED, 
             detail="Bạn không đủ credit để thực hiện phân tích (Cần 10 credits)"
         )
+    
+    # trut credit của user ngay khi tạo request để tránh tình trạng AI đã chạy xong nhưng user không đủ credit (do đã bị trừ rồi)
+    await db["users"].update_one(
+        {"_id": ObjectId(project["user_id"])},
+        {"$inc": {"available_credits": -10}}
+    )
+
+    # lưu transaction vào transaction history
+    transaction_repo = TransactionRepository(db)
+    transaction = CreditTransactionCreate(
+        user_id=str(project["user_id"]),
+        amount=10,
+        transaction_type=TransactionType.DEBIT,
+        description=f"Trừ 10 credits cho yêu cầu phân tích xu hướng (Project ID: {req_in.project_id})"
+    )
+    await transaction_repo.create(transaction)
+
 
     # 3. Lưu yêu cầu vào Database
     repo = AnalysisRepository(db)
@@ -576,13 +595,5 @@ async def ai_callback_handler(
                     upsert=True
                 )
                 logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
-
-
-
-    # truwf credit cuar user
-    await db["users"].update_one(
-        {"_id": user["_id"]},
-        {"$inc": {"available_credits": -10}}
-    )
 
     return {"status": "success"}
