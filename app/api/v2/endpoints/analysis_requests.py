@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+user = {}
+
 # --- 1. TẠO YÊU CẦU PHÂN TÍCH MỚI ---
 @router.post("/", response_model=AnalysisRequestRead, status_code=status.HTTP_201_CREATED)
 async def create_analysis_request(
@@ -46,7 +48,8 @@ async def create_analysis_request(
         raise HTTPException(status_code=404, detail="Không tìm thấy Project tương ứng")
     
     # kiểm tra credit của user
-    credits = await db["users"].find_one({"_id": ObjectId(project["user_id"])}, {"available_credits": 1})
+    user = await db["users"].find_one({"_id": ObjectId(project["user_id"])}, {"available_credits": 1})
+    credits = user.get("available_credits", 0) if user else 0
     if not credits or credits.get("available_credits", 0) < 10:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED, 
@@ -575,5 +578,11 @@ async def ai_callback_handler(
                 logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
 
 
+
+    # truwf credit cuar user
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$inc": {"available_credits": -10}}
+    )
 
     return {"status": "success"}
