@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v2.endpoints import auth, users, subscription_plans, analysis_requests, credit_transactions, generated_designs, projects, style_presets, trend_insights, billing
+from app.api.v2.endpoints import auth, users, subscription_plans, analysis_requests, credit_transactions, generated_designs, projects, style_presets, trend_insights, billing, trend_result
 
 api_router = APIRouter()
 
@@ -14,4 +14,4 @@ api_router.include_router(projects.router, prefix="/projects", tags=["Projects V
 api_router.include_router(style_presets.router, prefix="/style_presets", tags=["Style Presets V2"])
 api_router.include_router(trend_insights.router, prefix="/trend_insights", tags=["Trend Insights V2"])
 api_router.include_router(billing.router, prefix="/billing", tags=["Billing V2"])
-api_router.include_router(trend_insights.router, prefix="/trend-results", tags=["Trend Results V2"])
+api_router.include_router(trend_result.router, prefix="/trend-results", tags=["Trend Results V2"])

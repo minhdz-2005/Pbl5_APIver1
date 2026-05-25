@@ -24,10 +24,10 @@ class Settings(BaseSettings):
     BACKEND_URL: str = Field(..., env="BACKEND_URL")
 
     # Cloudinary Configuration
-    CLOUDINARY_CLOUD_NAME: str = Field(..., env="CLOUDINARY_CLOUD_NAME")
-    CLOUDINARY_API_KEY: str = Field(..., env="CLOUDINARY_API_KEY")
-    CLOUDINARY_API_SECRET: str = Field(..., env="CLOUDINARY_API_SECRET")
-    CLOUDINARY_URL: str | None = Field(None, env="CLOUDINARY_URL")
+    CLOUDINARY_CLOUD_NAME: str = Field(..., validation_alias="CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY: str = Field(..., validation_alias="CLOUDINARY_API_KEY")
+    CLOUDINARY_API_SECRET: str = Field(..., validation_alias="CLOUDINARY_API_SECRET")
+    CLOUDINARY_URL: str | None = Field(None, validation_alias="CLOUDINARY_URL")
 
     # Pydantic Settings Config
     model_config = SettingsConfigDict(

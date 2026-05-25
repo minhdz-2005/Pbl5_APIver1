@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
+from app.core import cloudinary
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.api.v1.router import api_router
 from app.api.v2.router import api_router as api_router_v2

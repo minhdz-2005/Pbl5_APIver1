@@ -1,6 +1,14 @@
+import asyncio
+import logging
+import cloudinary          # 1. IMPORT SDK GỐC ĐỂ DÙNG CHẠY HÀM UPLOAD
 import cloudinary.uploader
 from typing import Dict, Any
-from app.core.cloudinary import cloudinary  # Ensure cloudinary is configured
+
+# 2. IMPORT file core này để ÉP Python chạy đoạn code cấu hình tự động của bạn
+from app.core import cloudinary as cloudinary_initializer 
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 async def upload_image_to_cloudinary(
@@ -24,21 +32,58 @@ async def upload_image_to_cloudinary(
         Exception: If upload fails
     """
     try:
-        # Upload image to Cloudinary from URL
-        upload_result = cloudinary.uploader.upload(
+        # Ensure Cloudinary is configured at call time (idempotent)
+        try:
+            if settings.CLOUDINARY_URL:
+                # cloudinary.config(cloudinary_url=settings.CLOUDINARY_URL, secure=True)
+                cloudinary.config(url=settings.CLOUDINARY_URL, secure=True)
+                
+                # Để đề phòng SDK kén cấu hình URL, ta chủ động ép thêm 3 key lẻ từ settings luôn cho chắc chắn 100%
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                    api_key=settings.CLOUDINARY_API_KEY,
+                    api_secret=settings.CLOUDINARY_API_SECRET,
+                    secure=True
+                )
+                logger.warning(settings.CLOUDINARY_URL)
+            else:
+                cloudinary.config(
+                    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                    api_key=settings.CLOUDINARY_API_KEY,
+                    api_secret=settings.CLOUDINARY_API_SECRET,
+                    secure=True,
+                )
+                logger.warning(settings.CLOUDINARY_CLOUD_NAME)
+                logger.warning(settings.CLOUDINARY_API_KEY)
+                logger.warning(settings.CLOUDINARY_API_SECRET)
+        except Exception:
+            logger.debug("Could not (re)configure Cloudinary from settings before upload")
+
+        # Run the blocking upload call in a thread to avoid blocking the event loop
+        upload_result = await asyncio.to_thread(
+            cloudinary.uploader.upload,
             image_url,
             folder=f"pbl5/generated_designs/{generated_design_id}",
             resource_type="auto",
             quality="auto",
             fetch_format="auto"
         )
-        
-        # Return the design ID and Cloudinary URL
+
+        logger.debug("Cloudinary upload result: %s", upload_result)
+
         return {
             "design_id": generated_design_id,
-            "cloudinary_url": upload_result.get("secure_url"),
-            "public_id": upload_result.get("public_id")
+            "cloudinary_url": upload_result.get("secure_url") or upload_result.get("url"),
+            "public_id": upload_result.get("public_id"),
+            "raw": upload_result
         }
-    
+
     except Exception as e:
-        raise Exception(f"Failed to upload image to Cloudinary: {str(e)}")
+        logger.exception("Failed to upload image to Cloudinary: %s", e)
+        # Return structured error info to caller instead of raising to keep caller robust
+        return {
+            "design_id": generated_design_id,
+            "cloudinary_url": None,
+            "public_id": None,
+            "error": str(e)
+        }

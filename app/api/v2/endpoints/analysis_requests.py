@@ -508,14 +508,17 @@ async def ai_callback_handler(
                 
                 cloudinary_urls = []
                 for img_url in image_urls:
-                    try:
-                        result = await upload_image_to_cloudinary(img_url, str(request_id))
-                        cloudinary_urls.append(result["cloudinary_url"])
-                        logger.info(f"Successfully uploaded image to Cloudinary: {result['cloudinary_url']}")
-                    except Exception as e:
-                        logger.error(f"Failed to upload image {img_url} to Cloudinary: {str(e)}")
-                        cloudinary_urls.append(img_url)  # Fallback: sử dụng URL gốc nếu upload thất bại
-                
+                    result = await upload_image_to_cloudinary(img_url, str(request_id))
+                    # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
+                    c_url = result.get("cloudinary_url")
+                    if c_url:
+                        cloudinary_urls.append(c_url)
+                        logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
+                    else:
+                        logger.error("Upload failed for %s: %s", img_url, result.get("error"))
+                        cloudinary_urls.append(img_url)  # fallback to original URL
+
+                # replace the image_urls list with the Cloudinary URLs (or fallbacks)
                 image_urls = cloudinary_urls
 
                 await db["generated_designs"].update_one(

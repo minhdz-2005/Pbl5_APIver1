@@ -4,6 +4,14 @@ from typing import List
 from app.core.database import get_database # Giả định path của bạn
 from app.schemas.trend_result import TrendResultRead, TrendResultUpdate
 from app.repositories.trend_repository import TrendRepository
+from pydantic import BaseModel
+
+# Test upload service
+class UploadTestIn(BaseModel):
+    image_url: str
+    generated_design_id: str | None = None
+
+from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
 
 router = APIRouter(prefix="/trend-results", tags=["Trend Results"])
 
@@ -40,3 +48,36 @@ async def delete_trend(trend_id: str, db: AsyncIOMotorDatabase = Depends(get_dat
     if not deleted:
         raise HTTPException(status_code=404, detail="Không tìm thấy ID để xóa")
     return None
+
+
+@router.post("/test-upload", response_model=dict)
+async def test_upload_endpoint(payload: UploadTestIn):
+    """Endpoint tạm để test upload ảnh lên Cloudinary.
+
+    Gọi `upload_image_to_cloudinary` và trả về kết quả thô để debug.
+    """
+    gen_id = payload.generated_design_id or "test"
+    result = await upload_image_to_cloudinary(payload.image_url, gen_id)
+    return result
+
+
+@router.get("/debug/cloudinary-config", response_model=dict)
+async def debug_cloudinary_config():
+    """Return masked Cloudinary configuration presence for debugging (no secrets returned)."""
+    from app.core.config import settings
+
+    def mask(s: str | None) -> str | None:
+        if not s:
+            return None
+        if len(s) <= 8:
+            return s[:2] + "..."
+        return s[:4] + "..." + s[-4:]
+
+    return {
+        "has_cloudinary_url": bool(settings.CLOUDINARY_URL),
+        "cloudinary_url_masked": mask(settings.CLOUDINARY_URL),
+        "has_api_key": bool(settings.CLOUDINARY_API_KEY),
+        "cloudinary_api_key_masked": mask(settings.CLOUDINARY_API_KEY),
+        "has_cloud_name": bool(settings.CLOUDINARY_CLOUD_NAME),
+        "cloudinary_cloud_name_masked": mask(settings.CLOUDINARY_CLOUD_NAME),
+    }
