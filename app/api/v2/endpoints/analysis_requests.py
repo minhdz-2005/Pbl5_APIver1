@@ -460,24 +460,6 @@ async def ai_callback_handler(
             {"result_images": 1}
         )
         if not existing_request or not existing_request.get("result_images"):
-            # upload ảnh lên Cloudinary và cập nhật URL mới vào analysis_requests
-            # from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
-            
-            # cloudinary_urls = []
-            # for img_url in image_urls:
-            #     result = await upload_image_to_cloudinary(folder="analysis_requests", image_url=img_url, generated_design_id=str(request_id))
-            #     # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
-            #     c_url = result.get("cloudinary_url")
-            #     if c_url:
-            #         cloudinary_urls.append(c_url)
-            #         logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
-            #     else:
-            #         logger.error("Upload failed for %s: %s", img_url, result.get("error"))
-            #         cloudinary_urls.append(img_url)  # fallback to original URL
-
-            # # replace the image_urls list with the Cloudinary URLs (or fallbacks)
-            # image_urls = cloudinary_urls
-
             await db["analysis_requests"].update_one(
                 {"_id": ObjectId(request_id)},
                 {"$set": {
@@ -521,106 +503,41 @@ async def ai_callback_handler(
 
             # cập nhật generated_designs thay vì insert mới để tránh trùng lặp khi AI callback nhiều lần cho cùng một request_id
             if not analyzed:
-                from bson import ObjectId # Đảm bảo đã import ObjectId ở đầu file nếu chưa có
-                from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
-
-                # tạo một generated designs mới nếu chưa có và trả về generated design id để lưu ảnh lên cloudinary
-
-                await db["generated_designs"].insert_one({
-
-                    "request_id": str(request_id),
-
-                    "status": "GENERATING_IMAGES",
-
-                    "design_image_url": None,
-
-                    "user_rating": 5,
-
-                    "ai_job_id": None,
-
-                    "ai_metadata": None,
-
-                    "created_at": datetime.utcnow(),
-
-                    "updated_at": datetime.utcnow(),
-
-                })
-
-                logger.info(f"Đã tạo mới generated_designs cho request {request_id} với {len(design_documents)} thiết kế.")
-
-
-
                 # upload ảnh lên Cloudinary và cập nhật URL mới vào generated_designs
-
                 from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
-
-               
-
+                
                 cloudinary_urls = []
-
                 for img_url in image_urls:
-
-                    result = await upload_image_to_cloudinary(folder="generated_designs", image_url=img_url, generated_design_id=str(request_id))
-
+                    result = await upload_image_to_cloudinary(img_url, str(request_id))
                     # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
-
                     c_url = result.get("cloudinary_url")
-
                     if c_url:
-
                         cloudinary_urls.append(c_url)
-
                         logger.info("Successfully uploaded image to Cloudinary: %s", c_url)
-
                     else:
-
                         logger.error("Upload failed for %s: %s", img_url, result.get("error"))
-
                         cloudinary_urls.append(img_url)  # fallback to original URL
 
-
-
                 # replace the image_urls list with the Cloudinary URLs (or fallbacks)
-
                 image_urls = cloudinary_urls
 
-
-
                 await db["generated_designs"].update_one(
-
                     {"request_id": str(request_id)},
-
                     {
-
                         "$set": {
-
                             "status": "COMPLETED",
-
                             "user_rating": 5,
-
                             "ai_job_id": job_id,
-
                             "ai_metadata": data,
-
                             "updated_at": datetime.utcnow()
-
                         },
-
                         "$push": {
-
                             "design_image_url": {"$each": image_urls}
-
                         }
-
                     },
-
                     upsert=True
-
                 )
-
-                logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}") 
-
-
+                logger.info(f"Đã cập nhật {len(design_documents)} thiết kế cho request {request_id}")
 
 
 
