@@ -4,6 +4,8 @@ import cloudinary          # 1. IMPORT SDK GỐC ĐỂ DÙNG CHẠY HÀM UPLOAD
 import cloudinary.uploader
 from typing import Dict, Any
 
+import httpx
+
 # 2. IMPORT file core này để ÉP Python chạy đoạn code cấu hình tự động của bạn
 from app.core import cloudinary as cloudinary_initializer 
 from app.core.config import settings
@@ -59,10 +61,22 @@ async def upload_image_to_cloudinary(
         except Exception:
             logger.debug("Could not (re)configure Cloudinary from settings before upload")
 
+        # 1. Chủ động tải ảnh từ AI Server về Backend của bạn bằng httpx
+        async with httpx.AsyncClient() as client:
+            # Thêm header để ngrok KHÔNG hiện trang cảnh báo nữa mà trả về file ảnh luôn
+            headers = {"ngrok-skip-browser-warning": "6969"}
+            response = await client.get(image_url, headers=headers)
+            
+            if response.status_code != 200:
+                raise Exception(f"Không thể tải ảnh từ AI Server, Status code: {response.status_code}")
+            
+            # Lấy dữ liệu dạng bytes của bức ảnh
+            image_bytes = response.content
+
         # Run the blocking upload call in a thread to avoid blocking the event loop
         upload_result = await asyncio.to_thread(
             cloudinary.uploader.upload,
-            image_url,
+            image_bytes,
             folder=f"pbl5/generated_designs/{generated_design_id}",
             resource_type="auto",
             quality="auto",
