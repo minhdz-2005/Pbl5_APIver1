@@ -561,9 +561,8 @@ async def ai_callback_handler(
                 # Gán lại mảng danh sách URL ảnh đã upload thành công
                 image_urls = cloudinary_urls
 
-                # 4. Cập nhật lại bản ghi dựa vào CHÍNH XÁC ID của nó bằng ObjectId
                 await db["generated_designs"].update_one(
-                    {"_id": ObjectId(generated_design_id)}, # Tìm chính xác theo document ID thay vì tìm theo request_id chung chung
+                    {"request_id": str(request_id)},
                     {
                         "$set": {
                             "status": "COMPLETED",
@@ -573,9 +572,10 @@ async def ai_callback_handler(
                             "updated_at": datetime.utcnow()
                         },
                         "$push": {
-                            "design_image_url": {"$each": image_urls} # Đẩy mảng URL ảnh vào mảng rỗng ban đầu
+                            "design_image_url": {"$each": image_urls}
                         }
-                    }
+                    },
+                    upsert=True
                 )
                 logger.info(f"Đã cập nhật danh sách ảnh cho generated_design {generated_design_id}")
 
