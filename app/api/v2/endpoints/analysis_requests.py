@@ -59,26 +59,41 @@ async def create_analysis_request(
         )
     
     # trut credit của user ngay khi tạo request để tránh tình trạng AI đã chạy xong nhưng user không đủ credit (do đã bị trừ rồi)
-    await db["users"].update_one(
-        {"_id": ObjectId(project["user_id"])},
+    # 1. Trừ credit dưới DB
+    result = await db["users"].update_one(
+        {"_id": ObjectId(str(user["_id"]))},
         {"$inc": {"available_credits": -10}}
     )
 
-    # lưu transaction vào transaction history
-    transaction_repo = TransactionRepository(db)
-    transaction = CreditTransactionCreate(
-        user_id=str(project["user_id"]),
-        amount=10,
-        transaction_type=TransactionType.USAGE,
-        description=f"Trừ 10 credits cho yêu cầu phân tích xu hướng (Project ID: {req_in.project_id})"
-    )
-    await transaction_repo.create_transaction(transaction)
+    logger.warning(f"Matched: {result.matched_count}, Modified: {result.modified_count}")
 
+    # 2. Lấy bản ghi MỚI NHẤT từ DB
+    user_in_db = await db["users"].find_one({"_id": ObjectId(str(user["_id"]))})
+
+    if user_in_db:
+        # 3. ĐỒNG BỘ LẠI BIẾN USER: Gán hoặc cập nhật lại biến user cũ bằng dữ liệu mới từ DB
+        user = user_in_db  
+        
+        # Sửa lại cú pháp logger bằng F-string để không bị lỗi String Formatting nữa
+        logger.warning(f"===> SỐ CREDIT THỰC TẾ TRONG DB HIỆN TẠI LÀ: {user.get('available_credits')}")
+
+    # Lúc này biến 'user' đã mang giá trị mới (90), log ra sẽ chuẩn chỉnh 100%
+        logger.warning("user info hiện tại sau khi đồng bộ: %s", user)
 
     # 3. Lưu yêu cầu vào Database
     repo = AnalysisRepository(db)
     new_request = await repo.create(req_in)
     
+    # lưu transaction vào transaction history
+    transaction_repo = TransactionRepository(db)
+    transaction = CreditTransactionCreate(
+        user_id=str(project["user_id"]),
+        amount=10,
+        transaction_type=TransactionType.TOP_UP,
+        related_request_id=str(new_request["_id"]),
+        description=f"Trừ 10 credits cho yêu cầu phân tích xu hướng (Project ID: {req_in.project_id})"
+    )
+    await transaction_repo.create_transaction(transaction)
     # 4. KÍCH HOẠT TIẾN TRÌNH CHẠY NGẦM
     # Chúng ta truyền ID của request vừa tạo vào background task
     background_tasks.add_task(call_ai_trend_analysis, new_request["_id"], db)
@@ -271,24 +286,22 @@ async def trigger_generation(
 
     # 2. Kiểm tra số dư của User
     user = await db["users"].find_one({"_id": ObjectId(user_id)})
-    # if not user or user.get("available_credits", 0) < 10:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_402_PAYMENT_REQUIRED, 
-    #         detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
-    #     )
-    # # 3. Trừ credit và ghi nhận giao dịch
-    # transaction_repo = TransactionRepository(db)
-    # transaction = CreditTransactionCreate(
-    #     user_id=str(user_id),
-    #     amount=10,
-    #     transaction_type=TransactionType.DEBIT,
-    #     description=f"Trừ 10 credits cho yêu cầu tạo ảnh AI (Request ID: {request_id})"
-    # )
-    # await transaction_repo.create(transaction)
-    # await db["users"].update_one(
-    #     {"_id": ObjectId(user_id)},
-    #     {"$inc": {"available_credits": -10}}
-    # )
+    # 1. Trừ credit dưới DB
+    await db["users"].update_one(
+        {"_id": ObjectId(str(user["_id"]))},
+        {"$inc": {"available_credits": -20}}
+    )
+
+    # lưu transaction vào transaction history
+    transaction_repo = TransactionRepository(db)
+    transaction = CreditTransactionCreate(
+        user_id=str(project["user_id"]),
+        amount=20,
+        transaction_type=TransactionType.TOP_UP,
+        related_request_id=str(request_id),
+        description=f"Trừ 20 credits cho yêu cầu gen image"
+    )
+    await transaction_repo.create_transaction(transaction)
     
     
     # base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
@@ -362,8 +375,8 @@ async def trigger_generation(
     return {
         "status": "GENERATING_IMAGES",
         "message": "Đang tiến hành tạo ảnh thiết kế...",
-        "credits_deducted": 10,
-        "remaining_credits": user.get("available_credits", 0) - 10
+        "credits_deducted": 20,
+        "remaining_credits": user.get("available_credits", 0) - 20
     }
 
 # @router.get("/{request_id}/results", response_model=dict)

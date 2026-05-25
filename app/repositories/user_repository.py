@@ -33,7 +33,7 @@ class UserRepository:
         new_user = UserModel(
             **user_data,
             password_hash=self.hash_password(password),
-            available_credits=10, # Mặc định tặng 10 credits
+            available_credits=100, # Mặc định tặng 100 credits
             created_at=datetime.now(timezone.utc)
         )
         

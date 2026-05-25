@@ -27,10 +27,10 @@ class TransactionRepository:
 
         # 2. Cập nhật available_credits ở bảng User bằng toán tử $inc
         # amount có thể âm (USAGE) hoặc dương (TOP_UP)
-        await self.user_collection.update_one(
-            {"_id": ObjectId(tx_in.user_id)},
-            {"$inc": {"available_credits": tx_in.amount}}
-        )
+        # await self.user_collection.update_one(
+        #     {"_id": ObjectId(tx_in.user_id)},
+        #     {"$inc": {"available_credits": tx_in.amount}}
+        # )
 
         return tx_dict
 
