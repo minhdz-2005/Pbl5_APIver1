@@ -249,24 +249,24 @@ async def trigger_generation(
 
     # 2. Kiểm tra số dư của User
     user = await db["users"].find_one({"_id": ObjectId(user_id)})
-    if not user or user.get("available_credits", 0) < 10:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED, 
-            detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
-        )
-    # 3. Trừ credit và ghi nhận giao dịch
-    transaction_repo = TransactionRepository(db)
-    transaction = CreditTransactionCreate(
-        user_id=str(user_id),
-        amount=10,
-        transaction_type=TransactionType.DEBIT,
-        description=f"Trừ 10 credits cho yêu cầu tạo ảnh AI (Request ID: {request_id})"
-    )
-    await transaction_repo.create(transaction)
-    await db["users"].update_one(
-        {"_id": ObjectId(user_id)},
-        {"$inc": {"available_credits": -10}}
-    )
+    # if not user or user.get("available_credits", 0) < 10:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_402_PAYMENT_REQUIRED, 
+    #         detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
+    #     )
+    # # 3. Trừ credit và ghi nhận giao dịch
+    # transaction_repo = TransactionRepository(db)
+    # transaction = CreditTransactionCreate(
+    #     user_id=str(user_id),
+    #     amount=10,
+    #     transaction_type=TransactionType.DEBIT,
+    #     description=f"Trừ 10 credits cho yêu cầu tạo ảnh AI (Request ID: {request_id})"
+    # )
+    # await transaction_repo.create(transaction)
+    # await db["users"].update_one(
+    #     {"_id": ObjectId(user_id)},
+    #     {"$inc": {"available_credits": -10}}
+    # )
     
     
     # base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
