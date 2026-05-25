@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Backend Server Configuration
     BACKEND_URL: str = Field(..., env="BACKEND_URL")
 
+    # Cloudinary Configuration
+    CLOUDINARY_CLOUD_NAME: str = Field(..., env="CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY: str = Field(..., env="CLOUDINARY_API_KEY")
+    CLOUDINARY_API_SECRET: str = Field(..., env="CLOUDINARY_API_SECRET")
 
     # Pydantic Settings Config
     model_config = SettingsConfigDict(
