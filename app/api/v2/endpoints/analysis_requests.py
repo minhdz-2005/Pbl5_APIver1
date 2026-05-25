@@ -44,6 +44,14 @@ async def create_analysis_request(
     project = await db["projects"].find_one({"_id": ObjectId(req_in.project_id)})
     if not project:
         raise HTTPException(status_code=404, detail="Không tìm thấy Project tương ứng")
+    
+    # kiểm tra credit của user
+    credits = await db["users"].find_one({"_id": ObjectId(project["user_id"])}, {"available_credits": 1})
+    if not credits or credits.get("available_credits", 0) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, 
+            detail="Bạn không đủ credit để thực hiện phân tích (Cần 10 credits)"
+        )
 
     # 3. Lưu yêu cầu vào Database
     repo = AnalysisRepository(db)
@@ -241,33 +249,26 @@ async def trigger_generation(
 
     # 2. Kiểm tra số dư của User
     user = await db["users"].find_one({"_id": ObjectId(user_id)})
-    # if not user:
-    #     raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+    if not user or user.get("available_credits", 0) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, 
+            detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
+        )
+    # 3. Trừ credit và ghi nhận giao dịch
+    transaction_repo = TransactionRepository(db)
+    transaction = CreditTransactionCreate(
+        user_id=str(user_id),
+        amount=10,
+        transaction_type=TransactionType.DEBIT,
+        description=f"Trừ 10 credits cho yêu cầu tạo ảnh AI (Request ID: {request_id})"
+    )
+    await transaction_repo.create(transaction)
+    await db["users"].update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"available_credits": -10}}
+    )
     
-    # if user.get("available_credits", 0) < 10:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_402_PAYMENT_REQUIRED, 
-    #         detail="Bạn không đủ credit để tạo ảnh (Cần 10 credits)"
-    #     )
-
-    # 3. Trừ Credit
-    # tx_repo = TransactionRepository(db)
-    # tx_create = CreditTransactionCreate(
-    #     user_id=user_id,
-    #     transaction_type=TransactionType.USAGE,
-    #     amount=-10,
-    #     related_request_id=request_id
-    # )
-    # await tx_repo.create_transaction(tx_create)
-
-    # 4. Lấy Style Prompt từ collection 'style_presets'
-    # if not ObjectId.is_valid(data_in.target_style_id):
-    #     raise HTTPException(status_code=400, detail="ID style không hợp lệ")
     
-    # style_doc = await db["style_presets"].find_one({"_id": ObjectId(data_in.target_style_id)})
-    # style_prompt = style_doc.get("prompt", "Professional fashion photography") if style_doc else "Fashion design"
-
-    # 5. Lấy ảnh gốc (Base Image) từ trend_results
     # base_image_url = "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg"  # Default fallback
     base_image_url = data_in.base_image_url  # Lấy từ input của người dùng
 
