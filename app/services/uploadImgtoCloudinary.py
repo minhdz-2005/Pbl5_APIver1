@@ -77,7 +77,7 @@ async def upload_image_to_cloudinary(
         # Run the blocking upload call in a thread to avoid blocking the event loop
         upload_result = await asyncio.to_thread(
             cloudinary.uploader.upload,
-            image_url,
+            image_bytes,
             folder=f"pbl5/{folder_name}/{generated_design_id}",
             resource_type="auto",
             quality="auto",
