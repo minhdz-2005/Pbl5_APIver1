@@ -508,7 +508,7 @@ async def ai_callback_handler(
                 
                 cloudinary_urls = []
                 for img_url in image_urls:
-                    result = await upload_image_to_cloudinary(img_url, str(request_id))
+                    result = await upload_image_to_cloudinary("generated_designs", img_url, str(request_id))
                     # upload_image_to_cloudinary returns a dict with 'cloudinary_url' or 'error'
                     c_url = result.get("cloudinary_url")
                     if c_url:
