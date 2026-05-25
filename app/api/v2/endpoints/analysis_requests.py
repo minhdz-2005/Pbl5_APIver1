@@ -503,6 +503,21 @@ async def ai_callback_handler(
 
             # cập nhật generated_designs thay vì insert mới để tránh trùng lặp khi AI callback nhiều lần cho cùng một request_id
             if not analyzed:
+                # upload ảnh lên Cloudinary và cập nhật URL mới vào generated_designs
+                from app.services.uploadImgtoCloudinary import upload_image_to_cloudinary
+                
+                cloudinary_urls = []
+                for img_url in image_urls:
+                    try:
+                        result = await upload_image_to_cloudinary(img_url, str(request_id))
+                        cloudinary_urls.append(result["cloudinary_url"])
+                        logger.info(f"Successfully uploaded image to Cloudinary: {result['cloudinary_url']}")
+                    except Exception as e:
+                        logger.error(f"Failed to upload image {img_url} to Cloudinary: {str(e)}")
+                        cloudinary_urls.append(img_url)  # Fallback: sử dụng URL gốc nếu upload thất bại
+                
+                image_urls = cloudinary_urls
+
                 await db["generated_designs"].update_one(
                     {"request_id": str(request_id)},
                     {
