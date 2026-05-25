@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def upload_image_to_cloudinary(
-    folder: str,
+    folder_name: str,
     image_url: str,
     generated_design_id: str
 ) -> Dict[str, Any]:
@@ -77,8 +77,8 @@ async def upload_image_to_cloudinary(
         # Run the blocking upload call in a thread to avoid blocking the event loop
         upload_result = await asyncio.to_thread(
             cloudinary.uploader.upload,
-            image_bytes,
-            folder=folder,
+            image_url,
+            folder=f"pbl5/{folder_name}/{generated_design_id}",
             resource_type="auto",
             quality="auto",
             fetch_format="auto"
