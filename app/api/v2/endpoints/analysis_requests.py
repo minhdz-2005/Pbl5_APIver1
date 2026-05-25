@@ -69,10 +69,10 @@ async def create_analysis_request(
     transaction = CreditTransactionCreate(
         user_id=str(project["user_id"]),
         amount=10,
-        transaction_type=TransactionType.DEBIT,
+        transaction_type=TransactionType.USAGE,
         description=f"Trừ 10 credits cho yêu cầu phân tích xu hướng (Project ID: {req_in.project_id})"
     )
-    await transaction_repo.create(transaction)
+    await transaction_repo.create_transaction(transaction)
 
 
     # 3. Lưu yêu cầu vào Database
