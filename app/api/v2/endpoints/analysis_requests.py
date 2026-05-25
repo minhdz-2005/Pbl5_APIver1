@@ -530,8 +530,8 @@ async def ai_callback_handler(
                     "status": "GENERATING_IMAGES",
                     "design_image_url": [],  # Đổi thành mảng rỗng để tí nữa dùng $push không bị lỗi data type
                     "user_rating": 5,
-                    "ai_job_id": None,
-                    "ai_metadata": None,
+                    "ai_job_id": job_id,
+                    "ai_metadata": data,
                     "created_at": datetime.utcnow(),
                     "updated_at": datetime.utcnow(),
                 })
