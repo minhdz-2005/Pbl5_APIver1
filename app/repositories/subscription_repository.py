@@ -53,9 +53,6 @@ class SubscriptionRepository:
         result = await self.collection.delete_one({"_id": ObjectId(plan_id)})
         return result.deleted_count > 0
     
-# Giữ nguyên các phần import...
-
-class SubscriptionRepository:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db["subscription_plans"]
 
