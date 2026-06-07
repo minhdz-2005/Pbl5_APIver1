@@ -45,6 +45,17 @@ class TransactionRepository:
             transactions.append(doc)
         return transactions
 
+    async def get_all_transactions(self, limit: int | None = None) -> List[dict]:
+        """Lấy tất cả các bản ghi giao dịch. Nếu `limit` không None thì giới hạn số bản ghi trả về."""
+        transactions: List[dict] = []
+        cursor = self.collection.find().sort("created_at", -1)
+        if limit:
+            cursor = cursor.limit(limit)
+
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            transactions.append(doc)
+        return transactions
     async def get_total_credits_sold(self) -> int:
         """Tính tổng credits đã được bán qua các giao dịch TOP_UP."""
         pipeline = [

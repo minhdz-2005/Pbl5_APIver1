@@ -51,14 +51,33 @@ class DesignRepository:
 
     async def get_success_rate(self) -> float:
         """Tính tỷ lệ thiết kế thành công so với tổng số yêu cầu thiết kế."""
-        success_statuses = "COMPLETED"
-        total = await self.collection.count_documents({})
+        success_statuses = ["COMPLETED", "SUCCEEDED", "SUCCESS"]
+        
+        # Tính tổng tất cả designs
+        total_pipeline = [{"$count": "total"}]
+        total_result = await self.collection.aggregate(total_pipeline).to_list(length=1)
+        total = total_result[0]["total"] if total_result else 0
+        
         if total == 0:
             return 0.0
-        success_count = await self.collection.count_documents({"status": {"$in": success_statuses}})
+        
+        # Tính designs thành công
+        success_pipeline = [
+            {"$match": {"status": {"$in": success_statuses}}},
+            {"$count": "total"}
+        ]
+        success_result = await self.collection.aggregate(success_pipeline).to_list(length=1)
+        success_count = success_result[0]["total"] if success_result else 0
+        
         return round(success_count / total, 4)
 
     async def count_active_generations(self) -> int:
         """Đếm số thiết kế đang ở trạng thái sinh ảnh (đang chạy)."""
-        active_statuses = "GENERATING_IMAGES"
-        return await self.collection.count_documents({"status": {"$in": active_statuses}})
+        active_statuses = ["GENERATING_IMAGES", "RUNNING", "IN_PROGRESS", "PROCESSING"]
+        
+        pipeline = [
+            {"$match": {"status": {"$in": active_statuses}}},
+            {"$count": "total"}
+        ]
+        result = await self.collection.aggregate(pipeline).to_list(length=1)
+        return result[0]["total"] if result else 0
