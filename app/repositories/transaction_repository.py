@@ -45,6 +45,15 @@ class TransactionRepository:
             transactions.append(doc)
         return transactions
 
+    async def get_total_credits_sold(self) -> int:
+        """Tính tổng credits đã được bán qua các giao dịch TOP_UP."""
+        pipeline = [
+            {"$match": {"transaction_type": "TOP_UP"}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]
+        result = await self.collection.aggregate(pipeline).to_list(length=1)
+        return result[0]["total"] if result else 0
+
     async def get_by_id(self, tx_id: str) -> Optional[dict]:
         if not ObjectId.is_valid(tx_id):
             return None

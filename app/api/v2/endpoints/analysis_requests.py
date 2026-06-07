@@ -89,7 +89,7 @@ async def create_analysis_request(
     transaction = CreditTransactionCreate(
         user_id=str(project["user_id"]),
         amount=10,
-        transaction_type=TransactionType.TOP_UP,
+        transaction_type=TransactionType.USAGE,
         related_request_id=str(new_request["_id"]),
         description=f"Trừ 10 credits cho yêu cầu phân tích xu hướng (Project ID: {req_in.project_id})"
     )
@@ -297,7 +297,7 @@ async def trigger_generation(
     transaction = CreditTransactionCreate(
         user_id=str(project["user_id"]),
         amount=20,
-        transaction_type=TransactionType.TOP_UP,
+        transaction_type=TransactionType.USAGE,
         related_request_id=str(request_id),
         description=f"Trừ 20 credits cho yêu cầu gen image"
     )

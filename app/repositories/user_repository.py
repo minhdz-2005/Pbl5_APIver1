@@ -104,3 +104,32 @@ class UserRepository:
         if result:
             result["_id"] = str(result["_id"])
         return result
+
+    async def count_users(self) -> int:
+        """Đếm tổng số người dùng trong hệ thống."""
+        return await self.collection.count_documents({})
+
+    async def get_user_growth_by_month(self) -> List[dict]:
+        """Lấy số lượng người dùng theo từng tháng dựa trên created_at."""
+        pipeline = [
+            {
+                "$group": {
+                    "_id": {
+                        "year": {"$year": "$created_at"},
+                        "month": {"$month": "$created_at"}
+                    },
+                    "total": {"$sum": 1}
+                }
+            },
+            {"$sort": {"_id.year": 1, "_id.month": 1}}
+        ]
+
+        results = []
+        async for doc in self.collection.aggregate(pipeline):
+            year = doc["_id"]["year"]
+            month = doc["_id"]["month"]
+            results.append({
+                "datetime": datetime(year, month, 1, tzinfo=timezone.utc),
+                "total": doc["total"]
+            })
+        return results

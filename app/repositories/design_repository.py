@@ -48,3 +48,17 @@ class DesignRepository:
         if doc:
             doc["_id"] = str(doc["_id"])
         return doc
+
+    async def get_success_rate(self) -> float:
+        """Tính tỷ lệ thiết kế thành công so với tổng số yêu cầu thiết kế."""
+        success_statuses = "COMPLETED"
+        total = await self.collection.count_documents({})
+        if total == 0:
+            return 0.0
+        success_count = await self.collection.count_documents({"status": {"$in": success_statuses}})
+        return round(success_count / total, 4)
+
+    async def count_active_generations(self) -> int:
+        """Đếm số thiết kế đang ở trạng thái sinh ảnh (đang chạy)."""
+        active_statuses = "GENERATING_IMAGES"
+        return await self.collection.count_documents({"status": {"$in": active_statuses}})
