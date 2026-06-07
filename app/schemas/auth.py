@@ -31,3 +31,12 @@ class RegisterResponse(BaseModel):
     role: str
     available_credits: int
     created_at: datetime
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    detail: str

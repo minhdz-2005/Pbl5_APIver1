@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_database
-from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, RegisterResponse
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, LoginResponse, RegisterRequest, RegisterResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 
@@ -110,6 +111,53 @@ async def register_v2(
         raise
     except Exception as e:
         logger.error(f"V2 Registration Error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@router.post("/change-password/{user_id}")
+async def change_password(
+    user_id: str,
+    change_password_data: ChangePasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    # token: str = Depends(security.oauth2_scheme)
+):
+    try:
+        # 1. Xác thực token và lấy user_id
+        # payload = security.decode_access_token(token)
+        # user_id = payload.get("sub")
+        # if not user_id:
+        #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        # 2. Tìm user trong DB
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user ID")
+        user = await db["users"].find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # 3. Kiểm tra mật khẩu hiện tại
+        if not security.verify_password(change_password_data.current_password, user.get("password_hash", "")):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+        
+        # 4. Kiểm tra mật khẩu mới và xác nhận mật khẩu có khớp không
+        if change_password_data.new_password != change_password_data.confirm_password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password and confirm password do not match")
+
+        # 4. Hash mật khẩu mới và cập nhật vào DB
+        new_password_hash = security.get_password_hash(change_password_data.new_password)
+        await db["users"].update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"password_hash": new_password_hash}}
+        )
+
+        return {"detail": "Password changed successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Change Password Error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
