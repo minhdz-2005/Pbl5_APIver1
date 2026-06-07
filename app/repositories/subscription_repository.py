@@ -8,24 +8,6 @@ class SubscriptionRepository:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db["subscription_plans"]
 
-    async def create(self, plan_in: SubscriptionPlanCreate) -> dict:
-        plan_data = plan_in.model_dump()
-        new_plan = SubscriptionPlanModel(**plan_data)
-        
-        plan_dict = new_plan.model_dump()
-        result = await self.collection.insert_one(plan_dict)
-        
-        plan_dict["_id"] = str(result.inserted_id)
-        return plan_dict
-
-    async def get_all(self) -> List[dict]:
-        plans = []
-        cursor = self.collection.find()
-        async for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            plans.append(doc)
-        return plans
-
     async def get_by_name(self, plan_name: str) -> Optional[dict]:
         doc = await self.collection.find_one({"plan_name": plan_name})
         if doc:
@@ -52,9 +34,6 @@ class SubscriptionRepository:
             return False
         result = await self.collection.delete_one({"_id": ObjectId(plan_id)})
         return result.deleted_count > 0
-    
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db["subscription_plans"]
 
     # Hàm create giữ nguyên logic vì model_dump sẽ tự lấy field mới
     async def create(self, plan_in: SubscriptionPlanCreate) -> dict:

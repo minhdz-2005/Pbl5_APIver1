@@ -90,3 +90,17 @@ class UserRepository:
             return False
         result = await self.collection.delete_one({"_id": ObjectId(user_id)})
         return result.deleted_count > 0
+    
+    async def topup_credit(self, user_id: str, amount: int) -> Optional[dict]:
+        if not ObjectId.is_valid(user_id):
+            return None
+        
+        result = await self.collection.find_one_and_update(
+            {"_id": ObjectId(user_id)},
+            {"$inc": {"available_credits": amount}},
+            return_document=True
+        )
+        
+        if result:
+            result["_id"] = str(result["_id"])
+        return result
