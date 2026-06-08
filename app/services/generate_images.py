@@ -66,19 +66,19 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
                     logger.error(f"Lưu design vào DB thất bại: {res.text}")
         logger.warning("2")
         # 4. Cập nhật trạng thái cuối cùng cho Analysis Request
-        await db["analysis_requests"].update_one(
-            {"_id": ObjectId(request_id)},
-            {
-                "$set": {
-                    "status": "COMPLETED", 
-                    "updated_at": datetime.utcnow()
-                },
-                "$push": {
-                    "result_images": { "$each": image_urls } # Thêm từng URL trong list vào mảng hiện có
-                }
-            }
-        )
-        logger.warning(f"Hoàn tất đồng bộ {len(designs)} ảnh cho request {request_id}")
+        # await db["analysis_requests"].update_one(
+        #     {"_id": ObjectId(request_id)},
+        #     {
+        #         "$set": {
+        #             "status": "COMPLETED", 
+        #             "updated_at": datetime.utcnow()
+        #         },
+        #         "$push": {
+        #             "result_images": { "$each": image_urls } # Thêm từng URL trong list vào mảng hiện có
+        #         }
+        #     }
+        # )
+        # logger.warning(f"Hoàn tất đồng bộ {len(designs)} ảnh cho request {request_id}")
 
     except Exception as e:
         logger.error(f"Lỗi khi sync kết quả AI: {str(e)}")

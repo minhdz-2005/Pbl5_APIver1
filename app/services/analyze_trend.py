@@ -44,6 +44,42 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
                 "sales_velocity": 78,
                 "created_at": "2026-05-07T20:00:00Z"
             },
+            {
+                "product_name": "Elegant and Luxurious Middle-Aged Men's Vest", 
+                "image_url": "https://img.lazcdn.com/g/p/1b03190a29f316afe88a6397088c41d1.jpg_720x720q80.jpg_.webp",
+                "reviews": [
+                    "Đáng đồng tiền bát gạo, shop làm ăn uy tín đấy, form dáng ok",
+                    "Đóng gói kỹ xíu đi shop ơi bọc nilon mỏng dính, bù lại chất vải đẹp, đường may ok ko bị lỗi.",
+                    "Shop làm ăn bố láo, nhắn tin xin đổi size mà seen không thèm rep, thái độ lồi lõm với khách."
+                ],
+                "scenario": "Normal",
+                "sales_velocity": 60,
+                "created_at": "2026-05-07T20:00:00Z"
+            },
+            {
+                "product_name": "Middle-Aged Men's Suit Made of Tweed Material Imported from India", 
+                "image_url": "https://img.lazcdn.com/g/p/0341cb412893306fb4645281b48532da.jpg_720x720q80.jpg_.webp",
+                "reviews": [
+                    "Sợ áo mỏng nhận về nặng trịch dầy dặn bất ngờ hehe.",
+                    "Xỉu up xỉu down luôn á áo đỉnh vãi chưởng",
+                    "Dm giao mẹ cái giẻ rách à áo rách toạc mà cũng ship tốn tiền"
+                ],
+                "scenario": "Normal",
+                "sales_velocity": 86,
+                "created_at": "2026-05-07T20:00:00Z"
+            },
+            {
+                "product_name": "Charcoal Green Men's Suit with Tie, Groom's Suit, Men's Office Suit, Men's Suit Made of Beautiful Fabric, Wrinkle-Free, Not Ruffled.", 
+                "image_url": "https://img.lazcdn.com/g/ff/kf/Sa364139c1aba47a5b2f979448fcdc2eeP.jpg_720x720q80.jpg_.webp",
+                "reviews": [
+                    "Shop làm ăn vcl nhắn ko rep áo thì chật cứng bực mình bồi thường đi",
+                    "Mua cho chồng mặc đi đám cưới ai cũng khen đẹp, form lên vừa vặn lắm",
+                    "Trúc xinh trúc mọc đầu đình, em xinh em đứng một mình cũng xinh. Áo đẹp lắm nha shop 10 sao"
+                ],
+                "scenario": "Normal",
+                "sales_velocity": 76,
+                "created_at": "2026-05-07T20:00:00Z"
+            },
         ]
         products_data = []
         for p in products_cursor:
@@ -94,17 +130,22 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
             base_img = top_trend.get("source_image_url")
 
             # Kích hoạt luôn bước sinh ảnh
-            await request_ai_image_generation(
-                request_id=request_id,
-                db=db,
-                # target_style_prompt=style_prompt,
-                base_image_url=base_img
-            )
+            # await request_ai_image_generation(
+            #     request_id=request_id,
+            #     db=db,
+            #     # target_style_prompt=style_prompt,
+            #     base_image_url=base_img
+            # )
 
         # 6. Cập nhật trạng thái hoàn thành
         await db["analysis_requests"].update_one(
             {"_id": ObjectId(request_id)},
-            {"$set": {"status": "GENERATING_IMAGES", "updated_at": datetime.utcnow()}}
+            {"$set": {
+                "status": "COMPLETED", 
+                "updated_at": datetime.utcnow(),
+                "result_images": [trend.get("source_image_url") for trend in trends]  # Lưu lại ảnh gốc của các trend để user xem
+                }
+            }
         )
 
     except Exception as e:
