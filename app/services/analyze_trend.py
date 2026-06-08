@@ -1,5 +1,7 @@
 import httpx
 import logging
+import json
+import os
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 from datetime import datetime
@@ -30,58 +32,28 @@ async def call_ai_trend_analysis(request_id: str, db: AsyncIOMotorDatabase):
 
         # 3. Chuẩn bị dữ liệu gửi đi (Mapping theo schema AI Server yêu cầu)
         # Lưu ý: Phần 'products' này bạn cần query dựa trên project_id hoặc category_name của request
-        # products_cursor = db["products"].find({"project_id": analysis_req["project_id"]}).limit(20)
-        products_cursor = [
-            {
-                "product_name": "Vest nam, Áo vets nam chất liệu KAKI thô dày dặn...", 
-                "image_url": "https://img.lazcdn.com/g/ff/kf/S9a0617ab39034ee48328bc9fcb3b2514y.jpg",
-                "reviews": [
-                    "Chất liệu KAKI thô dày dặn",
-                    "Ít nhăn, ít nhàu",
-                    "Kiểu dáng tay lỡ trẻ trung"
-                ],
-                "scenario": "Normal",
-                "sales_velocity": 78,
-                "created_at": "2026-05-07T20:00:00Z"
-            },
-            {
-                "product_name": "Elegant and Luxurious Middle-Aged Men's Vest", 
-                "image_url": "https://img.lazcdn.com/g/p/1b03190a29f316afe88a6397088c41d1.jpg_720x720q80.jpg_.webp",
-                "reviews": [
-                    "Đáng đồng tiền bát gạo, shop làm ăn uy tín đấy, form dáng ok",
-                    "Đóng gói kỹ xíu đi shop ơi bọc nilon mỏng dính, bù lại chất vải đẹp, đường may ok ko bị lỗi.",
-                    "Shop làm ăn bố láo, nhắn tin xin đổi size mà seen không thèm rep, thái độ lồi lõm với khách."
-                ],
-                "scenario": "Normal",
-                "sales_velocity": 60,
-                "created_at": "2026-05-07T20:00:00Z"
-            },
-            {
-                "product_name": "Middle-Aged Men's Suit Made of Tweed Material Imported from India", 
-                "image_url": "https://img.lazcdn.com/g/p/0341cb412893306fb4645281b48532da.jpg_720x720q80.jpg_.webp",
-                "reviews": [
-                    "Sợ áo mỏng nhận về nặng trịch dầy dặn bất ngờ hehe.",
-                    "Xỉu up xỉu down luôn á áo đỉnh vãi chưởng",
-                    "Dm giao mẹ cái giẻ rách à áo rách toạc mà cũng ship tốn tiền"
-                ],
-                "scenario": "Normal",
-                "sales_velocity": 86,
-                "created_at": "2026-05-07T20:00:00Z"
-            },
-            {
-                "product_name": "Charcoal Green Men's Suit with Tie, Groom's Suit, Men's Office Suit, Men's Suit Made of Beautiful Fabric, Wrinkle-Free, Not Ruffled.", 
-                "image_url": "https://img.lazcdn.com/g/ff/kf/Sa364139c1aba47a5b2f979448fcdc2eeP.jpg_720x720q80.jpg_.webp",
-                "reviews": [
-                    "Shop làm ăn vcl nhắn ko rep áo thì chật cứng bực mình bồi thường đi",
-                    "Mua cho chồng mặc đi đám cưới ai cũng khen đẹp, form lên vừa vặn lắm",
-                    "Trúc xinh trúc mọc đầu đình, em xinh em đứng một mình cũng xinh. Áo đẹp lắm nha shop 10 sao"
-                ],
-                "scenario": "Normal",
-                "sales_velocity": 76,
-                "created_at": "2026-05-07T20:00:00Z"
-            },
-        ]
+        # Đọc dữ liệu sản phẩm từ file JSON
+        products_file_path = os.path.join(os.path.dirname(__file__), "../../src_img/formatted_products_reviews.json")
+        try:
+            with open(products_file_path, "r", encoding="utf-8") as f:
+                products_cursor = json.load(f)
+        except FileNotFoundError:
+            logger.error(f"Không tìm thấy file sản phẩm: {products_file_path}")
+            products_cursor = []
+        except json.JSONDecodeError:
+            logger.error(f"Lỗi đọc file JSON: {products_file_path}")
+            products_cursor = []
         products_data = []
+        
+        # Nếu không có dữ liệu sản phẩm, thoát khỏi hàm sớm
+        if not products_cursor:
+            logger.warning(f"Không có dữ liệu sản phẩm để phân tích cho request {request_id}")
+            await db["analysis_requests"].update_one(
+                {"_id": ObjectId(request_id)},
+                {"$set": {"status": "FAILED", "updated_at": datetime.utcnow()}}
+            )
+            return
+        
         for p in products_cursor:
             created_at = p.get("created_at", datetime.utcnow())
             # Handle both string and datetime objects
