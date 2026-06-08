@@ -371,6 +371,20 @@ async def trigger_generation(
         seed=data_in.seed
     )
 
+    # 8. lưu request payload vào generated design
+    await db["generated_designs"].update_one(
+        {"request_id": str(request_id)},
+        {"$set": {
+            "req_payload": {
+                "target_season": data_in.target_season,
+                "target_audience": data_in.target_audience,
+                "target_weather": data_in.target_weather,
+                "num_images": data_in.num_images,
+                "seed": data_in.seed
+            },
+            "updated_at": datetime.utcnow()
+        }}
+    )
     return {
         "status": "GENERATING_IMAGES",
         "message": "Đang tiến hành tạo ảnh thiết kế...",

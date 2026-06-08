@@ -123,7 +123,6 @@ async def request_ai_image_generation(
             {"$set": {
                 "status": "GENERATING_IMAGES", 
                 "base_img_url": base_image_url,
-                "req_payload": payload, # Lưu payload gốc để debug nếu cần
                 "updated_at": datetime.utcnow()
             }}
         )
