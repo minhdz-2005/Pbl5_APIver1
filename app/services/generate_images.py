@@ -101,17 +101,8 @@ async def request_ai_image_generation(
     Chỉ có callback_url được lấy từ cấu hình hệ thống.
     """
     try:
-        # 1. Cập nhật trạng thái yêu cầu
-        await db["analysis_requests"].update_one(
-            {"_id": ObjectId(request_id)},
-            {"$set": {
-                "status": "GENERATING_IMAGES", 
-                "base_img_url": base_image_url,
-                "updated_at": datetime.utcnow()
-            }}
-        )
 
-        # 2. Chuẩn bị Payload từ các tham số truyền vào
+        # 1. Chuẩn bị Payload từ các tham số truyền vào
         payload = {
             "request_id": str(request_id),
             "target_style_prompt": "dakakivest", # Tạm thời hardcode, sau này sẽ lấy từ style_presets
@@ -126,6 +117,16 @@ async def request_ai_image_generation(
             "canny_high_threshold": canny_high_threshold
         }
 
+        # 2. Cập nhật trạng thái yêu cầu
+        await db["analysis_requests"].update_one(
+            {"_id": ObjectId(request_id)},
+            {"$set": {
+                "status": "GENERATING_IMAGES", 
+                "base_img_url": base_image_url,
+                "req_payload": payload, # Lưu payload gốc để debug nếu cần
+                "updated_at": datetime.utcnow()
+            }}
+        )
         # 3. Gọi AI Server tạo Job
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(AI_IMAGE_GEN_URL, json=payload)
