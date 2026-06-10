@@ -115,7 +115,7 @@ async def get_project_requests_summary(
     detailed_requests = []
     async for req in requests_cursor:
         req_id_str = str(req["_id"])
-        
+
         # Lấy tên Style từ bảng style_presets
         style_name = "N/A"
         if req.get("target_style_id"):
@@ -128,6 +128,7 @@ async def get_project_requests_summary(
         design = await db["generated_designs"].find_one({"request_id": req_id_str})
         if design:
             thumb_url = design.get("design_image_url")
+            payload = design.get("req_payload", {})
 
         detailed_requests.append({
             "request_id": req_id_str,
@@ -135,7 +136,8 @@ async def get_project_requests_summary(
             "style_name": style_name,
             "status": req.get("status"),
             "created_at": req.get("created_at"),
-            "result_thumbnail_url": thumb_url
+            "result_thumbnail_url": thumb_url,
+            "payload": payload
         })
 
     # 3. Trả về cấu trúc đúng như FE yêu cầu
