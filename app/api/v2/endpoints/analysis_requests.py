@@ -362,7 +362,7 @@ async def trigger_generation(
         request_ai_image_generation,
         db=db,
         request_id=request_id,
-        target_style_prompt="dakakivest", # style_prompt,
+        target_style_prompt=data_in.target_style_prompt, # style_prompt,
         base_image_url=base_image_url,
         target_season=data_in.target_season,
         target_audience=data_in.target_audience,
