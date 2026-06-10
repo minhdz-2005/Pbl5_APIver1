@@ -86,7 +86,7 @@ async def sync_ai_design_results(request_id: str, job_id: str, db: AsyncIOMotorD
 async def request_ai_image_generation(
     db: AsyncIOMotorDatabase,
     request_id: str,
-    # target_style_prompt: str,
+    target_style_prompt: str,
     base_image_url: str, # URL ảnh gốc để AI dựa vào đó tạo ra thiết kế mới
     target_season: str = "Spring", # Mùa (ví dụ: "Spring", "Summer", "Autumn", "Winter") default là "Spring"
     target_audience: str = "General", # Đối tượng khách hàng (ví dụ: "General", "Youth", "Professional") default là "General"
@@ -105,7 +105,7 @@ async def request_ai_image_generation(
         # 1. Chuẩn bị Payload từ các tham số truyền vào
         payload = {
             "request_id": str(request_id),
-            "target_style_prompt": "dakakivest", # Tạm thời hardcode, sau này sẽ lấy từ style_presets
+            "target_style_prompt": target_style_prompt,
             "target_season": target_season,
             "target_audience": target_audience,
             "target_weather": target_weather,
