@@ -45,13 +45,7 @@ async def root():
         "docs": "/docs"
     }
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-    "https://pbl-5-ai-fashion.vercel.app/",
-]
+origins = ["*"] # Cho phép tất cả origin (có thể tùy chỉnh nếu cần)
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +54,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # 5. Để chạy trực tiếp bằng lệnh: python app/main.py
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
