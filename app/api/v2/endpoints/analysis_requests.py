@@ -348,14 +348,14 @@ async def trigger_generation(
             {"request_id": str(request_id)},
             {
                 "$set": {
-                    "req_payload": {
-                        "target_style_prompt": data_in.target_style_prompt, # style_prompt,"
-                        "target_season": data_in.target_season,
-                        "target_audience": data_in.target_audience,
-                        "target_weather": data_in.target_weather,
-                        "num_images": data_in.num_images,
-                        "seed": data_in.seed
-                    },
+                    # "req_payload": {
+                    #     "target_style_prompt": data_in.target_style_prompt, # style_prompt,"
+                    #     "target_season": data_in.target_season,
+                    #     "target_audience": data_in.target_audience,
+                    #     "target_weather": data_in.target_weather,
+                    #     "num_images": data_in.num_images,
+                    #     "seed": data_in.seed
+                    # },
                     "status": "GENERATING_IMAGES",
                     "updated_at": datetime.utcnow()
                 }
